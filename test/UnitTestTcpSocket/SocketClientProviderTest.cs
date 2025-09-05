@@ -8,7 +8,7 @@ using System.Net.Sockets;
 
 namespace UnitTestTcpSocket;
 
-public class DefaultSocketClientProviderTest
+public class SocketClientProviderTest
 {
     [Fact]
     public async Task DefaultSocketClient_Ok()

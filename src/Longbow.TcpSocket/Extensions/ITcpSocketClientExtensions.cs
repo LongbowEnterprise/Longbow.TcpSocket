@@ -230,24 +230,18 @@ public static class ITcpSocketClientExtensions
             ? converterType.Type.CreateInstance<IDataConverter<TEntity>>()
             : client.GetSocketDataConverter<TEntity>();
 
-        if (converter == null)
+        // 如果没有设置转换器则使用默认转换器
+        converter ??= new DataConverter<TEntity>();
+
+        adapter.ReceivedCallBack = async buffer =>
         {
-            // 未设置数据转换器返回 default 值
-            adapter.ReceivedCallBack = async buffer => await callback(default);
-        }
-        else
-        {
-            // 设置转化器
-            adapter.ReceivedCallBack = async buffer =>
+            TEntity? ret = default;
+            if (converter.TryConvertTo(buffer, out var t))
             {
-                TEntity? ret = default;
-                if (converter.TryConvertTo(buffer, out var t))
-                {
-                    ret = t;
-                }
-                await callback(ret);
-            };
-        }
+                ret = t;
+            }
+            await callback(ret);
+        };
     }
 
     /// <summary>
@@ -266,7 +260,7 @@ public static class ITcpSocketClientExtensions
         IDataConverter<TEntity>? converter = null;
         if (client is IServiceProvider provider)
         {
-            var converters = provider.GetRequiredService<IOptions<DataConverterCollections>>().Value;
+            var converters = provider.GetRequiredService<IOptions<DataConverterCollection>>().Value;
             if (converters.TryGetTypeConverter<TEntity>(out var v))
             {
                 converter = v;

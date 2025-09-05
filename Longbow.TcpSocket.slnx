@@ -23,6 +23,6 @@
     <Project Path="src/Longbow.TcpSocket/Longbow.TcpSocket.csproj" />
   </Folder>
   <Folder Name="/test/">
-    <Project Path="test/UnitTestSocket/UnitTestSocket.csproj" />
+    <Project Path="test/UnitTestTcpSocket/UnitTestTcpSocket.csproj" />
   </Folder>
 </Solution>

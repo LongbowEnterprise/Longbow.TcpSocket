@@ -6,7 +6,7 @@ using System.Net;
 
 namespace UnitTestTcpSocket;
 
-public class TcpSocketUtiityTest
+public class TcpSocketUtilityTest
 {
 
     [Fact]
