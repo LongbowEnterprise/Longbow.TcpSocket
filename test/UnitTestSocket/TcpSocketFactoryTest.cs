@@ -27,7 +27,7 @@ public class TcpSocketFactoryTest
         sc.AddTcpSocketFactory();
         var provider = sc.BuildServiceProvider();
         var factory = provider.GetRequiredService<ITcpSocketFactory>();
-        var client1 = factory.GetOrCreate("demo", op => op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0));
+        var client1 = factory.GetOrCreate("demo");
         await client1.CloseAsync();
 
         var client2 = factory.GetOrCreate("demo", op => op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0));
