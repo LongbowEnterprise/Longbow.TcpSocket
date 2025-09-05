@@ -266,7 +266,7 @@ public static class ITcpSocketClientExtensions
         IDataConverter<TEntity>? converter = null;
         if (client is IServiceProvider provider)
         {
-            var converters = provider.GetRequiredService<IOptions<DataConverterCollections>>().Value;
+            var converters = provider.GetRequiredService<IOptions<DataConverterCollection>>().Value;
             if (converters.TryGetTypeConverter<TEntity>(out var v))
             {
                 converter = v;
