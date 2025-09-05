@@ -780,7 +780,7 @@ public class TcpSocketFactoryTest
 
         var client = CreateClient(builder =>
         {
-            builder.Configure<DataConverterCollections>(options =>
+            builder.Configure<DataConverterCollection>(options =>
             {
                 options.AddTypeConverter<OptionConvertEntity>();
                 options.AddPropertyConverter<OptionConvertEntity>(entity => entity.Header, new DataPropertyConverterAttribute()
