@@ -751,7 +751,7 @@ public class TcpSocketFactoryTest
         Assert.NotNull(t);
         Assert.Equal([1, 2, 3, 4, 5], entity.Header);
 
-        // 测试 SetDataPackageAdapter 泛型无标签情况
+        // 测试 SetDataPackageAdapter 泛型无标签情况，内部使用 DataConverter 转换器
         tcs = new TaskCompletionSource();
         NoConvertEntity? noConvertEntity = null;
         client.AddDataPackageAdapter<NoConvertEntity>(adapter, t =>
@@ -762,7 +762,7 @@ public class TcpSocketFactoryTest
         });
         await client.SendAsync(data);
         await tcs.Task;
-        Assert.Null(noConvertEntity);
+        Assert.NotNull(noConvertEntity);
 
         var converter = new MockSocketDataConverter();
         result = converter.TryConvertTo(new byte[] { 0x1, 0x2 }, out t);
