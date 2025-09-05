@@ -1,0 +1,28 @@
+<Solution>
+  <Folder Name="/docs/">
+    <File Path="CHANGELOG.md" />
+    <File Path="CHANGELOG.zh-CN.md" />
+    <File Path="CODE_OF_CONDUCT.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="README.md" />
+    <File Path="README.zh-CN.md" />
+  </Folder>
+  <Folder Name="/misc/">
+    <File Path=".editorconfig" />
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
+    <File Path=".issuetracker" />
+    <File Path="exclusion.dic" />
+    <File Path="LICENSE" />
+    <File Path="NuGet.Config" />
+  </Folder>
+  <Folder Name="/props/">
+    <File Path="Directory.Build.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Longbow.TcpSocket/Longbow.TcpSocket.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/UnitTestSocket/UnitTestSocket.csproj" />
+  </Folder>
+</Solution>
