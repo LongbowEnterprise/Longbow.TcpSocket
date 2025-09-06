@@ -42,6 +42,9 @@ public class TcpSocketFactoryTest
         Assert.Equal(client4, client5);
         Assert.NotNull(client5);
 
+        await using var client6 = factory.GetOrCreate();
+        Assert.NotEqual(client5, client6);
+
         await client5.DisposeAsync();
         await factory.DisposeAsync();
     }
