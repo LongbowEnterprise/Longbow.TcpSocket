@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Version>9.0.3</Version>
@@ -10,6 +10,18 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <RepositoryUrl>https://github.com/LongbowEnterprise/Longbow.TcpSocket?wt.mc_id=DT-MVP-5004174</RepositoryUrl>
+    <PackageProjectUrl></PackageProjectUrl>
+    <RepositoryType>github</RepositoryType>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <DocumentationFile>$(MSBuildProjectName).xml</DocumentationFile>
+    <!--<PackageReadmeFile>readme.md</PackageReadmeFile>-->
+    <PackageReleaseNotes></PackageReleaseNotes>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0;net7.0;net8.0;net9.0</TargetFrameworks>
     <NET8Version>8.0.*</NET8Version>
     <NET9Version>9.0.*</NET9Version>
   </PropertyGroup>
