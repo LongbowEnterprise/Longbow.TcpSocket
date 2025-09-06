@@ -14,7 +14,7 @@ sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFact
 {
     private readonly ConcurrentDictionary<string, ITcpSocketClient> _pool = new();
 
-    public ITcpSocketClient GetOrCreate(string name, Action<TcpSocketClientOptions>? valueFactory = null)
+    public ITcpSocketClient GetOrCreate(string? name = null, Action<TcpSocketClientOptions>? valueFactory = null)
     {
         if (!SocketLogging.Inited)
         {
@@ -24,16 +24,19 @@ sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFact
                 SocketLogging.Init(logger);
             }
         }
-        return _pool.GetOrAdd(name, key =>
+
+        return string.IsNullOrEmpty(name) ? CreateClient(valueFactory) : _pool.GetOrAdd(name, key => CreateClient(valueFactory));
+    }
+
+    private DefaultTcpSocketClient CreateClient(Action<TcpSocketClientOptions>? valueFactory = null)
+    {
+        var options = new TcpSocketClientOptions();
+        valueFactory?.Invoke(options);
+        var client = new DefaultTcpSocketClient(options)
         {
-            var options = new TcpSocketClientOptions();
-            valueFactory?.Invoke(options);
-            var client = new DefaultTcpSocketClient(options)
-            {
-                ServiceProvider = provider,
-            };
-            return client;
-        });
+            ServiceProvider = provider,
+        };
+        return client;
     }
 
     public ITcpSocketClient? Remove(string name)
