@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
-using Longbow.Socket.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net;
@@ -45,10 +44,6 @@ public class TcpSocketFactoryTest
 
         await client5.DisposeAsync();
         await factory.DisposeAsync();
-
-        SocketLogging.LogWarning("Warning");
-        SocketLogging.LogDebug("Debug");
-        SocketLogging.LogInformation("Information");
     }
 
     [Fact]
