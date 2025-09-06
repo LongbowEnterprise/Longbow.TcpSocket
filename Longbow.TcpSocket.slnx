@@ -18,6 +18,8 @@
   </Folder>
   <Folder Name="/props/">
     <File Path="Directory.Build.props" />
+    <File Path="Logo.props" />
+    <File Path="SourceLink.targets" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Longbow.TcpSocket/Longbow.TcpSocket.csproj" />
