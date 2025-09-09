@@ -33,11 +33,11 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// </summary>
     public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
     {
-        _client = new TcpClient(LocalEndPoint);
         try
         {
             await _semaphoreSlimForConnect.WaitAsync(token).ConfigureAwait(false);
 
+            _client = new TcpClient(LocalEndPoint);
             await _client.ConnectAsync(endPoint, token).ConfigureAwait(false);
             if (_client.Connected)
             {
@@ -46,12 +46,12 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
                     LocalEndPoint = localEndPoint;
                 }
             }
+            return _client.Connected;
         }
         finally
         {
             _semaphoreSlimForConnect.Release();
         }
-        return _client.Connected;
     }
 
     /// <summary>
