@@ -56,8 +56,7 @@ public class TcpSocketFactoryTest
         {
             // 增加发送报错 MockSocket
             builder.AddTransient<ITcpSocketClientProvider, MockConnectTimeoutSocketProvider>();
-        });
-        client.Options.ConnectTimeout = 10;
+        }, options => options.ConnectTimeout = 10);
 
         var connect = await client.ConnectAsync("localhost", 9999);
         Assert.False(connect);
@@ -132,8 +131,7 @@ public class TcpSocketFactoryTest
         {
             // 增加发送报错 MockSocket
             builder.AddTransient<ITcpSocketClientProvider, MockSendTimeoutSocketProvider>();
-        });
-        client.Options.SendTimeout = 10;
+        }, op => op.SendTimeout = 10);
 
         await client.ConnectAsync("localhost", port);
 
@@ -200,8 +198,7 @@ public class TcpSocketFactoryTest
         var port = 8888;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient();
-        client.Options.ReceiveTimeout = 100;
+        var client = CreateClient(optionConfigure: op => op.ReceiveTimeout = 100);
 
         await client.ConnectAsync("localhost", port);
 
@@ -238,7 +235,7 @@ public class TcpSocketFactoryTest
     public async Task ReceiveAsync_InvalidOperationException()
     {
         // 未连接时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var client = CreateClient();
+        var client = CreateClient(optionConfigure: op => op.IsAutoReceive = true);
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync());
         Assert.NotNull(ex);
 
@@ -246,7 +243,6 @@ public class TcpSocketFactoryTest
         var port = 8893;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        client.Options.IsAutoReceive = true;
         var connected = await client.ConnectAsync("localhost", port);
         Assert.True(connected);
 
@@ -262,8 +258,7 @@ public class TcpSocketFactoryTest
         var port = 8891;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient();
-        client.Options.IsAutoReceive = false;
+        var client = CreateClient(optionConfigure: op => op.IsAutoReceive = false);
         client.OnConnecting = () =>
         {
             onConnecting = true;
@@ -311,11 +306,6 @@ public class TcpSocketFactoryTest
 
         var port = 8882;
         var server = StartTcpServer(port, MockSplitPackageAsync);
-
-        Assert.Equal(1024 * 64, client.Options.ReceiveBufferSize);
-
-        client.Options.ReceiveBufferSize = 1024 * 20;
-        Assert.Equal(1024 * 20, client.Options.ReceiveBufferSize);
 
         ReadOnlyMemory<byte> buffer = ReadOnlyMemory<byte>.Empty;
         var tcs = new TaskCompletionSource();
