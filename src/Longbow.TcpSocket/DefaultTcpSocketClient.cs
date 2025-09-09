@@ -14,16 +14,6 @@ namespace Longbow.TcpSocket;
 sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider, ITcpSocketClient
 {
     /// <summary>
-    /// Gets or sets the socket client provider used for managing socket connections.
-    /// </summary>
-    private ITcpSocketClientProvider? SocketClientProvider { get; set; }
-
-    /// <summary>
-    /// Gets or sets the logger instance used for logging messages and events.
-    /// </summary>
-    private ILogger? Logger { get; set; }
-
-    /// <summary>
     /// Gets or sets the service provider used to resolve dependencies.
     /// </summary>
     [NotNull]
@@ -37,12 +27,12 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public bool IsConnected => SocketClientProvider?.IsConnected ?? false;
+    public bool IsConnected => _socketProvider?.IsConnected ?? false;
 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public IPEndPoint LocalEndPoint => SocketClientProvider?.LocalEndPoint ?? new IPEndPoint(IPAddress.Any, 0);
+    public IPEndPoint LocalEndPoint => _socketProvider?.LocalEndPoint ?? new IPEndPoint(IPAddress.Any, 0);
 
     /// <summary>
     /// <inheritdoc/>
@@ -59,6 +49,8 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     /// </summary>
     public Func<Task>? OnConnected { get; set; }
 
+    private ILogger? _logger;
+    private ITcpSocketClientProvider? _socketProvider;
     private IPEndPoint? _remoteEndPoint;
     private IPEndPoint? _localEndPoint;
     private CancellationTokenSource? _receiveCancellationTokenSource;
@@ -89,9 +81,9 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
                 await OnConnecting();
             }
 
-            SocketClientProvider = ServiceProvider?.GetRequiredService<ITcpSocketClientProvider>()
+            _socketProvider = ServiceProvider?.GetRequiredService<ITcpSocketClientProvider>()
                 ?? throw new InvalidOperationException("SocketClientProvider is not registered in the service provider.");
-            ret = await ConnectCoreAsync(SocketClientProvider, endPoint, connectionToken);
+            ret = await ConnectCoreAsync(_socketProvider, endPoint, connectionToken);
 
             if (OnConnected != null)
             {
@@ -189,7 +181,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     /// <returns></returns>
     public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        if (SocketClientProvider is not { IsConnected: true })
+        if (_socketProvider is not { IsConnected: true })
         {
             throw new InvalidOperationException($"TCP Socket is not connected {LocalEndPoint}");
         }
@@ -205,7 +197,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
                 var sendTokenSource = new CancellationTokenSource(options.SendTimeout);
                 sendToken = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token).Token;
             }
-            ret = await SocketClientProvider.SendAsync(data, sendToken);
+            ret = await _socketProvider.SendAsync(data, sendToken);
         }
         catch (OperationCanceledException ex)
         {
@@ -241,7 +233,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     /// <returns></returns>
     public async ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default)
     {
-        if (SocketClientProvider is not { IsConnected: true })
+        if (_socketProvider is not { IsConnected: true })
         {
             throw new InvalidOperationException($"TCP Socket is not connected {LocalEndPoint}");
         }
@@ -253,7 +245,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
 
         using var block = MemoryPool<byte>.Shared.Rent(options.ReceiveBufferSize);
         var buffer = block.Memory;
-        var len = await ReceiveCoreAsync(SocketClientProvider, buffer, token);
+        var len = await ReceiveCoreAsync(_socketProvider, buffer, token);
         if (len == 0)
         {
             Reconnect();
@@ -267,14 +259,14 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
         _receiveCancellationTokenSource ??= new();
         while (_receiveCancellationTokenSource is { IsCancellationRequested: false })
         {
-            if (SocketClientProvider is not { IsConnected: true })
+            if (_socketProvider is not { IsConnected: true })
             {
                 throw new InvalidOperationException($"TCP Socket is not connected {LocalEndPoint}");
             }
 
             using var block = MemoryPool<byte>.Shared.Rent(options.ReceiveBufferSize);
             var buffer = block.Memory;
-            var len = await ReceiveCoreAsync(SocketClientProvider, buffer, _receiveCancellationTokenSource.Token);
+            var len = await ReceiveCoreAsync(_socketProvider, buffer, _receiveCancellationTokenSource.Token);
             if (len == 0)
             {
                 // 远端关闭或者 DisposeAsync 方法被调用时退出
@@ -351,8 +343,8 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     {
         if (options.EnableLog)
         {
-            Logger ??= ServiceProvider?.GetRequiredService<ILogger<DefaultTcpSocketClient>>();
-            Logger?.Log(logLevel, ex, "{Message}", message);
+            _logger ??= ServiceProvider?.GetRequiredService<ILogger<DefaultTcpSocketClient>>();
+            _logger?.Log(logLevel, ex, "{Message}", message);
         }
     }
 
@@ -382,11 +374,9 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
             _receiveCancellationTokenSource = null;
         }
 
-        if (SocketClientProvider != null)
+        if (_socketProvider != null)
         {
-            await SocketClientProvider.CloseAsync();
-            await SocketClientProvider.DisposeAsync();
-            SocketClientProvider = null;
+            await _socketProvider.CloseAsync();
         }
     }
 
