@@ -223,7 +223,7 @@ public class TcpSocketFactoryTest
         var type = client.GetType();
         Assert.NotNull(type);
 
-        var fieldInfo = type.GetField("_receiveCancellationTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
+        var fieldInfo = type.GetField("_autoReceiveTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(fieldInfo);
         var tokenSource = fieldInfo.GetValue(client) as CancellationTokenSource;
         Assert.NotNull(tokenSource);
@@ -350,6 +350,9 @@ public class TcpSocketFactoryTest
         var server = StartTcpServer(port, LoopSendPackageAsync);
         await Task.Delay(250);
         Assert.True(client.IsConnected);
+
+        await client.CloseAsync();
+        await Task.Delay(250);
 
         await client.DisposeAsync();
     }
