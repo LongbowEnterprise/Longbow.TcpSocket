@@ -385,6 +385,8 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
         if (SocketClientProvider != null)
         {
             await SocketClientProvider.CloseAsync();
+            await SocketClientProvider.DisposeAsync();
+            SocketClientProvider = null;
         }
     }
 
