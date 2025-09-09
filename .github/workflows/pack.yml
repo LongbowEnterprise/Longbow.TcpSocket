@@ -1,0 +1,30 @@
+name: Package to Nuget
+
+on:
+  push:
+    branches:
+      - pack
+      - release
+      - hotfix
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET Core SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Publish to Nuget
+      env:
+        NUGET_API_KEY: ${{secrets.NUGET_API_KEY}}
+        Bundle: True
+
+      run: |
+        dotnet build src/Longbow.TcpSocket
+        dotnet pack src/Longbow.TcpSocket -c Release -o publish
+        dotnet nuget push publish/Longbow.TcpSocket.*.nupkg -s https://api.nuget.org/v3/index.json -k $NUGET_API_KEY --skip-duplicate
