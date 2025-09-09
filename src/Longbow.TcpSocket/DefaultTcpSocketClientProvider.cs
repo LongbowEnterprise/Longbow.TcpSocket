@@ -27,6 +27,7 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
     private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
+    private readonly SemaphoreSlim _semaphoreSlimForSendAndReceive = new(1, 1);
 
     /// <summary>
     /// <inheritdoc/>
@@ -62,9 +63,17 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         var ret = false;
         if (_client != null)
         {
-            var stream = _client.GetStream();
-            await stream.WriteAsync(data, token).ConfigureAwait(false);
-            ret = true;
+            try
+            {
+                await _semaphoreSlimForSendAndReceive.WaitAsync(token).ConfigureAwait(false);
+                var stream = _client.GetStream();
+                await stream.WriteAsync(data, token).ConfigureAwait(false);
+                ret = true;
+            }
+            finally
+            {
+                _semaphoreSlimForSendAndReceive.Release();
+            }
         }
         return ret;
     }
@@ -77,12 +86,20 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         var len = 0;
         if (_client is { Connected: true })
         {
-            var stream = _client.GetStream();
-            len = await stream.ReadAsync(buffer, token).ConfigureAwait(false);
-
-            if (len == 0)
+            try
             {
-                _client.Close();
+                await _semaphoreSlimForSendAndReceive.WaitAsync(token).ConfigureAwait(false);
+                var stream = _client.GetStream();
+                len = await stream.ReadAsync(buffer, token).ConfigureAwait(false);
+
+                if (len == 0)
+                {
+                    _client.Close();
+                }
+            }
+            finally
+            {
+                _semaphoreSlimForSendAndReceive.Release();
             }
         }
         return len;
