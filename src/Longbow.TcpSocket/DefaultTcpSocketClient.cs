@@ -48,7 +48,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private ITcpSocketClientProvider? _socketProvider;
     private IPEndPoint? _remoteEndPoint;
     private IPEndPoint? _localEndPoint;
-    private CancellationTokenSource? _receiveCancellationTokenSource;
+    private CancellationTokenSource? _autoReceiveTokenSource;
     private CancellationTokenSource? _reconnectTokenSource;
     private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
 
@@ -136,7 +136,14 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
 
     private async ValueTask<bool> ConnectCoreAsync(ITcpSocketClientProvider provider, IPEndPoint endPoint, CancellationToken token)
     {
-        // 创建新的 TcpClient 实例
+        // 取消自动接收任务
+        if (_autoReceiveTokenSource != null)
+        {
+            _autoReceiveTokenSource.Cancel();
+            _autoReceiveTokenSource.Dispose();
+            _autoReceiveTokenSource = null;
+        }
+
         provider.LocalEndPoint = options.LocalEndPoint;
 
         _localEndPoint = options.LocalEndPoint;
@@ -252,8 +259,8 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private async ValueTask AutoReceiveAsync()
     {
         // 自动接收方法
-        _receiveCancellationTokenSource ??= new();
-        while (_receiveCancellationTokenSource is { IsCancellationRequested: false })
+        _autoReceiveTokenSource ??= new();
+        while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
             if (_socketProvider is not { IsConnected: true })
             {
@@ -262,15 +269,13 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
 
             using var block = MemoryPool<byte>.Shared.Rent(options.ReceiveBufferSize);
             var buffer = block.Memory;
-            var len = await ReceiveCoreAsync(_socketProvider, buffer, _receiveCancellationTokenSource.Token);
+            var len = await ReceiveCoreAsync(_socketProvider, buffer, _autoReceiveTokenSource.Token);
             if (len == 0)
             {
                 // 远端关闭或者 DisposeAsync 方法被调用时退出
                 break;
             }
         }
-
-        Reconnect();
     }
 
     private async ValueTask<int> ReceiveCoreAsync(ITcpSocketClientProvider client, Memory<byte> buffer, CancellationToken token)
@@ -363,11 +368,11 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private async Task CloseCoreAsync()
     {
         // 取消接收数据的任务
-        if (_receiveCancellationTokenSource != null)
+        if (_autoReceiveTokenSource != null)
         {
-            _receiveCancellationTokenSource.Cancel();
-            _receiveCancellationTokenSource.Dispose();
-            _receiveCancellationTokenSource = null;
+            _autoReceiveTokenSource.Cancel();
+            _autoReceiveTokenSource.Dispose();
+            _autoReceiveTokenSource = null;
         }
 
         if (_socketProvider != null)
