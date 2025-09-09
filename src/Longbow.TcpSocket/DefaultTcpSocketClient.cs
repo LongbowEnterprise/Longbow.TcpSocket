@@ -79,36 +79,23 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
             return true;
         }
 
-        var connectionToken = GenerateConnectionToken(token);
-        try
-        {
-            await _semaphoreSlimForConnect.WaitAsync(connectionToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // 如果信号量等待被取消，则直接返回 IsConnected
-            // 不管是超时还是被取消，都不需要重连，肯定有其他线程在连接中
-            return IsConnected;
-        }
-
-        if (IsConnected)
-        {
-            _semaphoreSlimForConnect.Release();
-            return true;
-        }
-
         var reconnect = true;
         var ret = false;
-        SocketClientProvider = ServiceProvider?.GetRequiredService<ITcpSocketClientProvider>()
-            ?? throw new InvalidOperationException("SocketClientProvider is not registered in the service provider.");
 
         try
         {
+            var connectionToken = GenerateConnectionToken(token);
+            await _semaphoreSlimForConnect.WaitAsync(connectionToken).ConfigureAwait(false);
+
             if (OnConnecting != null)
             {
                 await OnConnecting();
             }
+
+            SocketClientProvider = ServiceProvider?.GetRequiredService<ITcpSocketClientProvider>()
+                ?? throw new InvalidOperationException("SocketClientProvider is not registered in the service provider.");
             ret = await ConnectCoreAsync(SocketClientProvider, endPoint, connectionToken);
+
             if (OnConnected != null)
             {
                 await OnConnected();
@@ -181,6 +168,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
         {
             _localEndPoint = provider.LocalEndPoint;
 
+            // 开启自动接收数据功能
             if (options.IsAutoReceive)
             {
                 _ = Task.Run(AutoReceiveAsync, CancellationToken.None).ConfigureAwait(false);
