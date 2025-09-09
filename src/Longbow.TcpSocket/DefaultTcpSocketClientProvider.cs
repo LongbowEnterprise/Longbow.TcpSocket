@@ -98,6 +98,25 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
             _client.Close();
             _client = null;
         }
+
         return ValueTask.CompletedTask;
+    }
+
+    private async ValueTask DisposeAsync(bool disposing)
+    {
+        if (disposing)
+        {
+            await CloseAsync();
+            _semaphoreSlimForConnect.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsync(true);
+        GC.SuppressFinalize(this);
     }
 }
