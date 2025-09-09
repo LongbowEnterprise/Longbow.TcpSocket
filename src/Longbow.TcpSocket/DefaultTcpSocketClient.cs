@@ -64,8 +64,6 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private CancellationTokenSource? _receiveCancellationTokenSource;
     private CancellationTokenSource? _autoConnectTokenSource;
 
-    private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
-
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
@@ -85,7 +83,6 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
         try
         {
             var connectionToken = GenerateConnectionToken(token);
-            await _semaphoreSlimForConnect.WaitAsync(connectionToken).ConfigureAwait(false);
 
             if (OnConnecting != null)
             {
@@ -116,11 +113,6 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
         catch (Exception ex)
         {
             Log(LogLevel.Error, ex, $"TCP Socket connection failed from {LocalEndPoint} to {endPoint}");
-        }
-        finally
-        {
-            // 释放信号量
-            _semaphoreSlimForConnect.Release();
         }
 
         if (reconnect)
