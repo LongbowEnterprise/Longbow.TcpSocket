@@ -12,7 +12,7 @@ namespace Longbow.TcpSocket;
 /// TcpSocket 客户端默认实现
 /// </summary>
 [UnsupportedOSPlatform("browser")]
-class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
+sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
     private TcpClient? _client;
 
