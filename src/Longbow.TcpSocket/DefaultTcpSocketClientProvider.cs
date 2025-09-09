@@ -26,32 +26,21 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// </summary>
     public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
-    private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
-
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
     public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
     {
-        try
+        _client = new TcpClient(LocalEndPoint);
+        await _client.ConnectAsync(endPoint, token).ConfigureAwait(false);
+        if (_client.Connected)
         {
-            await _semaphoreSlimForConnect.WaitAsync(token).ConfigureAwait(false);
-
-            _client = new TcpClient(LocalEndPoint);
-            await _client.ConnectAsync(endPoint, token).ConfigureAwait(false);
-            if (_client.Connected)
+            if (_client.Client.LocalEndPoint is IPEndPoint localEndPoint)
             {
-                if (_client.Client.LocalEndPoint is IPEndPoint localEndPoint)
-                {
-                    LocalEndPoint = localEndPoint;
-                }
+                LocalEndPoint = localEndPoint;
             }
-            return _client.Connected;
         }
-        finally
-        {
-            _semaphoreSlimForConnect.Release();
-        }
+        return _client.Connected;
     }
 
     /// <summary>
@@ -107,7 +96,6 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         if (disposing)
         {
             await CloseAsync();
-            _semaphoreSlimForConnect.Dispose();
         }
     }
 
