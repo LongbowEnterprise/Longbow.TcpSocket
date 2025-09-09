@@ -31,6 +31,8 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// </summary>
     public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
     {
+        await CloseAsync();
+
         _client = new TcpClient(LocalEndPoint);
         await _client.ConnectAsync(endPoint, token).ConfigureAwait(false);
         if (_client.Connected)
