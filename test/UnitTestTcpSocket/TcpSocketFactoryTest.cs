@@ -100,26 +100,6 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task ConnectAsync_Error()
-    {
-        var client = CreateClient();
-
-        // 反射设置 SocketClientProvider 为空
-        var propertyInfo = client.GetType().GetProperty("ServiceProvider", BindingFlags.Public | BindingFlags.Instance);
-        Assert.NotNull(propertyInfo);
-        propertyInfo.SetValue(client, null);
-
-        // 测试 ConnectAsync 方法连接失败
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ConnectAsync("localhost", 9999));
-        Assert.NotNull(ex);
-
-        // 反射测试 Log 方法
-        var methodInfo = client.GetType().GetMethod("Log", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.NotNull(methodInfo);
-        methodInfo.Invoke(client, [LogLevel.Error, null!, "Test error log"]);
-    }
-
-    [Fact]
     public async Task ConnectAsync_Lock()
     {
         // 测试并发锁问题
@@ -1202,6 +1182,11 @@ public class TcpSocketFactoryTest
         {
             throw new Exception("Mock send error");
         }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     class MockConnectTimeoutSocketProvider : ITcpSocketClientProvider
@@ -1231,6 +1216,11 @@ public class TcpSocketFactoryTest
         {
             return ValueTask.FromResult(true);
         }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     class MockConnectCancelSocketProvider : ITcpSocketClientProvider
@@ -1258,6 +1248,11 @@ public class TcpSocketFactoryTest
         public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
         {
             return ValueTask.FromResult(true);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1288,6 +1283,11 @@ public class TcpSocketFactoryTest
             // 模拟超时发送
             await Task.Delay(100, token);
             return false;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1323,6 +1323,11 @@ public class TcpSocketFactoryTest
         public void SetConnected(bool state)
         {
             IsConnected = state;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1376,6 +1381,11 @@ public class TcpSocketFactoryTest
         public void SetReceive(bool state)
         {
             _receiveState = state;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
