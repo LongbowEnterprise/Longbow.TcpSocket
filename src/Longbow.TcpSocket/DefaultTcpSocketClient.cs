@@ -119,7 +119,12 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
 
     private void Reconnect()
     {
-        if (options.IsAutoReconnect && _remoteEndPoint != null)
+        if (options.IsAutoReconnect == false)
+        {
+            return;
+        }
+
+        if (_remoteEndPoint != null)
         {
             Task.Run(async () =>
             {
@@ -362,11 +367,6 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
             _reconnectTokenSource = null;
         }
 
-        await CloseCoreAsync();
-    }
-
-    private async Task CloseCoreAsync()
-    {
         // 取消接收数据的任务
         if (_autoReceiveTokenSource != null)
         {
