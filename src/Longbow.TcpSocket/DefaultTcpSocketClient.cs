@@ -22,11 +22,6 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public TcpSocketClientOptions Options => options;
-
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
     public bool IsConnected => _socketProvider?.IsConnected ?? false;
 
     /// <summary>
@@ -55,7 +50,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private IPEndPoint? _localEndPoint;
     private CancellationTokenSource? _receiveCancellationTokenSource;
     private CancellationTokenSource? _reconnectTokenSource;
-    private SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
+    private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
 
     /// <summary>
     /// <inheritdoc/>
@@ -142,9 +137,9 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private async ValueTask<bool> ConnectCoreAsync(ITcpSocketClientProvider provider, IPEndPoint endPoint, CancellationToken token)
     {
         // 创建新的 TcpClient 实例
-        provider.LocalEndPoint = Options.LocalEndPoint;
+        provider.LocalEndPoint = options.LocalEndPoint;
 
-        _localEndPoint = Options.LocalEndPoint;
+        _localEndPoint = options.LocalEndPoint;
         _remoteEndPoint = endPoint;
 
         var ret = await provider.ConnectAsync(endPoint, token);
@@ -165,7 +160,7 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
     private CancellationToken GenerateConnectionToken(CancellationToken token)
     {
         var connectionToken = token;
-        if (Options.ConnectTimeout > 0)
+        if (options.ConnectTimeout > 0)
         {
             // 设置连接超时时间
             var connectTokenSource = new CancellationTokenSource(options.ConnectTimeout);

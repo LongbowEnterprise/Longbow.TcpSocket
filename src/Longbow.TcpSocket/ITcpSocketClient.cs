@@ -17,11 +17,6 @@ public interface ITcpSocketClient : IAsyncDisposable
     bool IsConnected { get; }
 
     /// <summary>
-    /// Gets or sets the configuration options for the socket client.
-    /// </summary>
-    TcpSocketClientOptions Options { get; }
-
-    /// <summary>
     /// Gets the local network endpoint that the socket is bound to.
     /// </summary>
     /// <remarks>This property provides information about the local endpoint of the socket, which is typically
