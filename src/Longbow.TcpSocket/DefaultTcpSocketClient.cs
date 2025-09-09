@@ -11,7 +11,7 @@ using System.Runtime.Versioning;
 namespace Longbow.TcpSocket;
 
 [UnsupportedOSPlatform("browser")]
-class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider, ITcpSocketClient
+sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider, ITcpSocketClient
 {
     /// <summary>
     /// Gets or sets the socket client provider used for managing socket connections.
