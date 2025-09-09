@@ -14,7 +14,7 @@ namespace Longbow.TcpSocket;
 /// establishing connections, transmitting data, and receiving data asynchronously. Implementations of this interface
 /// should ensure proper resource management, including closing connections and releasing resources when no longer
 /// needed.</remarks>
-public interface ITcpSocketClientProvider
+public interface ITcpSocketClientProvider : IAsyncDisposable
 {
     /// <summary>
     /// Gets a value indicating whether the connection is currently active.

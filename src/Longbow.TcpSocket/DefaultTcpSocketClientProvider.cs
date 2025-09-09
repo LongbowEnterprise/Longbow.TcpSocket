@@ -12,7 +12,7 @@ namespace Longbow.TcpSocket;
 /// TcpSocket 客户端默认实现
 /// </summary>
 [UnsupportedOSPlatform("browser")]
-class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
+sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
     private TcpClient? _client;
 
@@ -31,6 +31,8 @@ class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// </summary>
     public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
     {
+        await CloseAsync();
+
         _client = new TcpClient(LocalEndPoint);
         await _client.ConnectAsync(endPoint, token).ConfigureAwait(false);
         if (_client.Connected)
@@ -87,6 +89,24 @@ class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
             _client.Close();
             _client = null;
         }
+
         return ValueTask.CompletedTask;
+    }
+
+    private async ValueTask DisposeAsync(bool disposing)
+    {
+        if (disposing)
+        {
+            await CloseAsync();
+        }
+    }
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await DisposeAsync(true);
+        GC.SuppressFinalize(this);
     }
 }

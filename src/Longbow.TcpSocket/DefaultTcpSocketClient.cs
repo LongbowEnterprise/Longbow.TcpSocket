@@ -11,18 +11,8 @@ using System.Runtime.Versioning;
 namespace Longbow.TcpSocket;
 
 [UnsupportedOSPlatform("browser")]
-class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider, ITcpSocketClient
+sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider, ITcpSocketClient
 {
-    /// <summary>
-    /// Gets or sets the socket client provider used for managing socket connections.
-    /// </summary>
-    private ITcpSocketClientProvider? SocketClientProvider { get; set; }
-
-    /// <summary>
-    /// Gets or sets the logger instance used for logging messages and events.
-    /// </summary>
-    private ILogger? Logger { get; set; }
-
     /// <summary>
     /// Gets or sets the service provider used to resolve dependencies.
     /// </summary>
@@ -32,17 +22,12 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public TcpSocketClientOptions Options => options;
+    public bool IsConnected => _socketProvider?.IsConnected ?? false;
 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public bool IsConnected => SocketClientProvider?.IsConnected ?? false;
-
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
-    public IPEndPoint LocalEndPoint => SocketClientProvider?.LocalEndPoint ?? new IPEndPoint(IPAddress.Any, 0);
+    public IPEndPoint LocalEndPoint => _socketProvider?.LocalEndPoint ?? new IPEndPoint(IPAddress.Any, 0);
 
     /// <summary>
     /// <inheritdoc/>
@@ -59,12 +44,13 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     /// </summary>
     public Func<Task>? OnConnected { get; set; }
 
+    private ILogger? _logger;
+    private ITcpSocketClientProvider? _socketProvider;
     private IPEndPoint? _remoteEndPoint;
     private IPEndPoint? _localEndPoint;
-    private CancellationTokenSource? _receiveCancellationTokenSource;
-    private CancellationTokenSource? _autoConnectTokenSource;
-
-    private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
+    private CancellationTokenSource? _autoReceiveTokenSource;
+    private CancellationTokenSource? _reconnectTokenSource;
+    private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
 
     /// <summary>
     /// <inheritdoc/>
@@ -79,36 +65,22 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
             return true;
         }
 
-        var connectionToken = GenerateConnectionToken(token);
-        try
-        {
-            await _semaphoreSlim.WaitAsync(connectionToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // 如果信号量等待被取消，则直接返回 IsConnected
-            // 不管是超时还是被取消，都不需要重连，肯定有其他线程在连接中
-            return IsConnected;
-        }
-
-        if (IsConnected)
-        {
-            _semaphoreSlim.Release();
-            return true;
-        }
-
         var reconnect = true;
         var ret = false;
-        SocketClientProvider = ServiceProvider?.GetRequiredService<ITcpSocketClientProvider>()
-            ?? throw new InvalidOperationException("SocketClientProvider is not registered in the service provider.");
 
         try
         {
+            await _semaphoreSlimForConnect.WaitAsync(token).ConfigureAwait(false);
+
             if (OnConnecting != null)
             {
                 await OnConnecting();
             }
-            ret = await ConnectCoreAsync(SocketClientProvider, endPoint, connectionToken);
+
+            var connectionToken = GenerateConnectionToken(token);
+            _socketProvider ??= ServiceProvider.GetRequiredService<ITcpSocketClientProvider>();
+            ret = await ConnectCoreAsync(_socketProvider, endPoint, connectionToken);
+
             if (OnConnected != null)
             {
                 await OnConnected();
@@ -130,32 +102,37 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
         {
             Log(LogLevel.Error, ex, $"TCP Socket connection failed from {LocalEndPoint} to {endPoint}");
         }
-
-        // 释放信号量
-        _semaphoreSlim.Release();
-
-        if (reconnect)
+        finally
         {
-            _autoConnectTokenSource = new();
-
-            if (!ret)
+            if (_semaphoreSlimForConnect.CurrentCount == 0)
             {
-                Reconnect();
+                _semaphoreSlimForConnect.Release();
             }
+        }
+
+        if (reconnect && !ret)
+        {
+            Reconnect();
         }
         return ret;
     }
 
     private void Reconnect()
     {
-        if (_autoConnectTokenSource != null && options.IsAutoReconnect && _remoteEndPoint != null)
+        if (options.IsAutoReconnect == false)
+        {
+            return;
+        }
+
+        if (_remoteEndPoint != null)
         {
             Task.Run(async () =>
             {
                 try
                 {
-                    await Task.Delay(options.ReconnectInterval, _autoConnectTokenSource.Token).ConfigureAwait(false);
-                    await ConnectAsync(_remoteEndPoint, _autoConnectTokenSource.Token).ConfigureAwait(false);
+                    _reconnectTokenSource ??= new();
+                    await Task.Delay(options.ReconnectInterval, _reconnectTokenSource.Token).ConfigureAwait(false);
+                    await ConnectAsync(_remoteEndPoint, _reconnectTokenSource.Token).ConfigureAwait(false);
                 }
                 catch { }
             }, CancellationToken.None).ConfigureAwait(false);
@@ -164,13 +141,17 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
 
     private async ValueTask<bool> ConnectCoreAsync(ITcpSocketClientProvider provider, IPEndPoint endPoint, CancellationToken token)
     {
-        // 释放资源
-        await CloseCoreAsync();
+        // 取消自动接收任务
+        if (_autoReceiveTokenSource != null)
+        {
+            _autoReceiveTokenSource.Cancel();
+            _autoReceiveTokenSource.Dispose();
+            _autoReceiveTokenSource = null;
+        }
 
-        // 创建新的 TcpClient 实例
-        provider.LocalEndPoint = Options.LocalEndPoint;
+        provider.LocalEndPoint = options.LocalEndPoint;
 
-        _localEndPoint = Options.LocalEndPoint;
+        _localEndPoint = options.LocalEndPoint;
         _remoteEndPoint = endPoint;
 
         var ret = await provider.ConnectAsync(endPoint, token);
@@ -179,6 +160,7 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
         {
             _localEndPoint = provider.LocalEndPoint;
 
+            // 开启自动接收数据功能
             if (options.IsAutoReceive)
             {
                 _ = Task.Run(AutoReceiveAsync, CancellationToken.None).ConfigureAwait(false);
@@ -190,7 +172,7 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     private CancellationToken GenerateConnectionToken(CancellationToken token)
     {
         var connectionToken = token;
-        if (Options.ConnectTimeout > 0)
+        if (options.ConnectTimeout > 0)
         {
             // 设置连接超时时间
             var connectTokenSource = new CancellationTokenSource(options.ConnectTimeout);
@@ -207,7 +189,7 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     /// <returns></returns>
     public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        if (SocketClientProvider is not { IsConnected: true })
+        if (_socketProvider is not { IsConnected: true })
         {
             throw new InvalidOperationException($"TCP Socket is not connected {LocalEndPoint}");
         }
@@ -223,7 +205,7 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
                 var sendTokenSource = new CancellationTokenSource(options.SendTimeout);
                 sendToken = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token).Token;
             }
-            ret = await SocketClientProvider.SendAsync(data, sendToken);
+            ret = await _socketProvider.SendAsync(data, sendToken);
         }
         catch (OperationCanceledException ex)
         {
@@ -259,7 +241,7 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     /// <returns></returns>
     public async ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default)
     {
-        if (SocketClientProvider is not { IsConnected: true })
+        if (_socketProvider is not { IsConnected: true })
         {
             throw new InvalidOperationException($"TCP Socket is not connected {LocalEndPoint}");
         }
@@ -271,7 +253,7 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
 
         using var block = MemoryPool<byte>.Shared.Rent(options.ReceiveBufferSize);
         var buffer = block.Memory;
-        var len = await ReceiveCoreAsync(SocketClientProvider, buffer, token);
+        var len = await ReceiveCoreAsync(_socketProvider, buffer, token);
         if (len == 0)
         {
             Reconnect();
@@ -282,25 +264,23 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     private async ValueTask AutoReceiveAsync()
     {
         // 自动接收方法
-        _receiveCancellationTokenSource ??= new();
-        while (_receiveCancellationTokenSource is { IsCancellationRequested: false })
+        _autoReceiveTokenSource ??= new();
+        while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
-            if (SocketClientProvider is not { IsConnected: true })
+            if (_socketProvider is not { IsConnected: true })
             {
                 throw new InvalidOperationException($"TCP Socket is not connected {LocalEndPoint}");
             }
 
             using var block = MemoryPool<byte>.Shared.Rent(options.ReceiveBufferSize);
             var buffer = block.Memory;
-            var len = await ReceiveCoreAsync(SocketClientProvider, buffer, _receiveCancellationTokenSource.Token);
+            var len = await ReceiveCoreAsync(_socketProvider, buffer, _autoReceiveTokenSource.Token);
             if (len == 0)
             {
                 // 远端关闭或者 DisposeAsync 方法被调用时退出
                 break;
             }
         }
-
-        Reconnect();
     }
 
     private async ValueTask<int> ReceiveCoreAsync(ITcpSocketClientProvider client, Memory<byte> buffer, CancellationToken token)
@@ -369,8 +349,8 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     {
         if (options.EnableLog)
         {
-            Logger ??= ServiceProvider?.GetRequiredService<ILogger<DefaultTcpSocketClient>>();
-            Logger?.Log(logLevel, ex, "{Message}", message);
+            _logger ??= ServiceProvider.GetRequiredService<ILogger<DefaultTcpSocketClient>>();
+            _logger.Log(logLevel, ex, "{Message}", message);
         }
     }
 
@@ -380,29 +360,24 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
     public async ValueTask CloseAsync()
     {
         // 取消重连任务
-        if (_autoConnectTokenSource != null)
+        if (_reconnectTokenSource != null)
         {
-            _autoConnectTokenSource.Cancel();
-            _autoConnectTokenSource.Dispose();
-            _autoConnectTokenSource = null;
+            _reconnectTokenSource.Cancel();
+            _reconnectTokenSource.Dispose();
+            _reconnectTokenSource = null;
         }
 
-        await CloseCoreAsync();
-    }
-
-    private async ValueTask CloseCoreAsync()
-    {
         // 取消接收数据的任务
-        if (_receiveCancellationTokenSource != null)
+        if (_autoReceiveTokenSource != null)
         {
-            _receiveCancellationTokenSource.Cancel();
-            _receiveCancellationTokenSource.Dispose();
-            _receiveCancellationTokenSource = null;
+            _autoReceiveTokenSource.Cancel();
+            _autoReceiveTokenSource.Dispose();
+            _autoReceiveTokenSource = null;
         }
 
-        if (SocketClientProvider != null)
+        if (_socketProvider != null)
         {
-            await SocketClientProvider.CloseAsync();
+            await _socketProvider.CloseAsync();
         }
     }
 
@@ -426,6 +401,12 @@ class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider,
         if (disposing)
         {
             await CloseAsync();
+
+            if (_socketProvider != null)
+            {
+                await _socketProvider.DisposeAsync();
+                _socketProvider = null;
+            }
         }
     }
 

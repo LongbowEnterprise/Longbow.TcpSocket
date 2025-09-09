@@ -56,8 +56,7 @@ public class TcpSocketFactoryTest
         {
             // 增加发送报错 MockSocket
             builder.AddTransient<ITcpSocketClientProvider, MockConnectTimeoutSocketProvider>();
-        });
-        client.Options.ConnectTimeout = 10;
+        }, options => options.ConnectTimeout = 10);
 
         var connect = await client.ConnectAsync("localhost", 9999);
         Assert.False(connect);
@@ -100,26 +99,6 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task ConnectAsync_Error()
-    {
-        var client = CreateClient();
-
-        // 反射设置 SocketClientProvider 为空
-        var propertyInfo = client.GetType().GetProperty("ServiceProvider", BindingFlags.Public | BindingFlags.Instance);
-        Assert.NotNull(propertyInfo);
-        propertyInfo.SetValue(client, null);
-
-        // 测试 ConnectAsync 方法连接失败
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ConnectAsync("localhost", 9999));
-        Assert.NotNull(ex);
-
-        // 反射测试 Log 方法
-        var methodInfo = client.GetType().GetMethod("Log", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.NotNull(methodInfo);
-        methodInfo.Invoke(client, [LogLevel.Error, null!, "Test error log"]);
-    }
-
-    [Fact]
     public async Task ConnectAsync_Lock()
     {
         // 测试并发锁问题
@@ -152,8 +131,7 @@ public class TcpSocketFactoryTest
         {
             // 增加发送报错 MockSocket
             builder.AddTransient<ITcpSocketClientProvider, MockSendTimeoutSocketProvider>();
-        });
-        client.Options.SendTimeout = 10;
+        }, op => op.SendTimeout = 10);
 
         await client.ConnectAsync("localhost", port);
 
@@ -220,8 +198,7 @@ public class TcpSocketFactoryTest
         var port = 8888;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient();
-        client.Options.ReceiveTimeout = 100;
+        var client = CreateClient(optionConfigure: op => op.ReceiveTimeout = 100);
 
         await client.ConnectAsync("localhost", port);
 
@@ -246,7 +223,7 @@ public class TcpSocketFactoryTest
         var type = client.GetType();
         Assert.NotNull(type);
 
-        var fieldInfo = type.GetField("_receiveCancellationTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
+        var fieldInfo = type.GetField("_autoReceiveTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(fieldInfo);
         var tokenSource = fieldInfo.GetValue(client) as CancellationTokenSource;
         Assert.NotNull(tokenSource);
@@ -258,7 +235,7 @@ public class TcpSocketFactoryTest
     public async Task ReceiveAsync_InvalidOperationException()
     {
         // 未连接时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var client = CreateClient();
+        var client = CreateClient(optionConfigure: op => op.IsAutoReceive = true);
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync());
         Assert.NotNull(ex);
 
@@ -266,7 +243,6 @@ public class TcpSocketFactoryTest
         var port = 8893;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        client.Options.IsAutoReceive = true;
         var connected = await client.ConnectAsync("localhost", port);
         Assert.True(connected);
 
@@ -282,8 +258,7 @@ public class TcpSocketFactoryTest
         var port = 8891;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient();
-        client.Options.IsAutoReceive = false;
+        var client = CreateClient(optionConfigure: op => op.IsAutoReceive = false);
         client.OnConnecting = () =>
         {
             onConnecting = true;
@@ -332,11 +307,6 @@ public class TcpSocketFactoryTest
         var port = 8882;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        Assert.Equal(1024 * 64, client.Options.ReceiveBufferSize);
-
-        client.Options.ReceiveBufferSize = 1024 * 20;
-        Assert.Equal(1024 * 20, client.Options.ReceiveBufferSize);
-
         ReadOnlyMemory<byte> buffer = ReadOnlyMemory<byte>.Empty;
         var tcs = new TaskCompletionSource();
 
@@ -380,6 +350,9 @@ public class TcpSocketFactoryTest
         var server = StartTcpServer(port, LoopSendPackageAsync);
         await Task.Delay(250);
         Assert.True(client.IsConnected);
+
+        await client.CloseAsync();
+        await Task.Delay(250);
 
         await client.DisposeAsync();
     }
@@ -1202,6 +1175,11 @@ public class TcpSocketFactoryTest
         {
             throw new Exception("Mock send error");
         }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     class MockConnectTimeoutSocketProvider : ITcpSocketClientProvider
@@ -1231,6 +1209,11 @@ public class TcpSocketFactoryTest
         {
             return ValueTask.FromResult(true);
         }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     class MockConnectCancelSocketProvider : ITcpSocketClientProvider
@@ -1258,6 +1241,11 @@ public class TcpSocketFactoryTest
         public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
         {
             return ValueTask.FromResult(true);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1288,6 +1276,11 @@ public class TcpSocketFactoryTest
             // 模拟超时发送
             await Task.Delay(100, token);
             return false;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1323,6 +1316,11 @@ public class TcpSocketFactoryTest
         public void SetConnected(bool state)
         {
             IsConnected = state;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1376,6 +1374,11 @@ public class TcpSocketFactoryTest
         public void SetReceive(bool state)
         {
             _receiveState = state;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
         }
     }
 
