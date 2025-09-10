@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <Version>9.0.5</Version>
@@ -47,14 +47,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Longbow.Socket" Version="9.*" />
+    <PackageReference Include="Longbow.Sockets" Version="9.*" />
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Longbow.Socket.DataAdapters" />
-    <Using Include="Longbow.Socket.DataHandlers" />
-    <Using Include="Longbow.Socket.DataConverters" />
-    <Using Include="Longbow.Socket.Logging" />
+    <Using Include="Longbow.Sockets.DataAdapters" />
+    <Using Include="Longbow.Sockets.DataHandlers" />
+    <Using Include="Longbow.Sockets.DataConverters" />
+    <Using Include="Longbow.Sockets.Logging" />
   </ItemGroup>
 
 </Project>
