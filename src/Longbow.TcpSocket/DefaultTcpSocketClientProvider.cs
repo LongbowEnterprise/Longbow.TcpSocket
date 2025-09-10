@@ -14,12 +14,13 @@ namespace Longbow.TcpSocket;
 [UnsupportedOSPlatform("browser")]
 sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
-    private TcpClient? _client;
+    private TcpClient? _tcpClient;
+    private Sender? _sender;
 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public bool IsConnected => _client?.Connected ?? false;
+    public bool IsConnected => _tcpClient?.Connected ?? false;
 
     /// <summary>
     /// <inheritdoc/>
@@ -33,16 +34,18 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     {
         await CloseAsync();
 
-        _client = new TcpClient(LocalEndPoint);
-        await _client.ConnectAsync(endPoint, token).ConfigureAwait(false);
-        if (_client.Connected)
+        _tcpClient = new TcpClient(LocalEndPoint);
+        _sender = new Sender(_tcpClient.Client);
+
+        await _tcpClient.ConnectAsync(endPoint, token).ConfigureAwait(false);
+        if (_tcpClient.Connected)
         {
-            if (_client.Client.LocalEndPoint is IPEndPoint localEndPoint)
+            if (_tcpClient.Client.LocalEndPoint is IPEndPoint localEndPoint)
             {
                 LocalEndPoint = localEndPoint;
             }
         }
-        return _client.Connected;
+        return _tcpClient.Connected;
     }
 
     /// <summary>
@@ -51,10 +54,9 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
         var ret = false;
-        if (_client != null)
+        if (_sender != null)
         {
-            var stream = _client.GetStream();
-            await stream.WriteAsync(data, token).ConfigureAwait(false);
+            await _sender.SendAsync(data, token);
             ret = true;
         }
         return ret;
@@ -66,14 +68,14 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     public async ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         var len = 0;
-        if (_client is { Connected: true })
+        if (_tcpClient is { Connected: true })
         {
-            var stream = _client.GetStream();
+            var stream = _tcpClient.GetStream();
             len = await stream.ReadAsync(buffer, token).ConfigureAwait(false);
 
             if (len == 0)
             {
-                _client.Close();
+                _tcpClient.Close();
             }
         }
         return len;
@@ -84,10 +86,16 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// </summary>
     public ValueTask CloseAsync()
     {
-        if (_client != null)
+        if (_tcpClient != null)
         {
-            _client.Close();
-            _client = null;
+            _tcpClient.Close();
+            _tcpClient = null;
+        }
+
+        if (_sender != null)
+        {
+            _sender.Dispose();
+            _sender = null;
         }
 
         return ValueTask.CompletedTask;
