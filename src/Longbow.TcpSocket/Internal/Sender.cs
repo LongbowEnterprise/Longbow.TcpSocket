@@ -8,12 +8,12 @@ using System.Runtime.InteropServices;
 
 namespace Longbow.TcpSocket;
 
-internal class Sender : IDisposable
+sealed class Sender : IDisposable
 {
+    private readonly Socket _socket;
     private readonly SocketAsyncEventArgs _args;
-    private readonly System.Net.Sockets.Socket _socket;
 
-    public Sender(System.Net.Sockets.Socket socket)
+    public Sender(Socket socket)
     {
         _socket = socket;
         _args = new();
@@ -23,7 +23,9 @@ internal class Sender : IDisposable
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
         var tcs = new TaskCompletionSource();
+        token.Register(() => tcs.TrySetCanceled());
         var state = new SendState();
+
         try
         {
             if (MemoryMarshal.TryGetArray(data, out var segment))
@@ -63,6 +65,7 @@ internal class Sender : IDisposable
         }
         else
         {
+            _socket.Close();
             tcs.TrySetException(new SocketException((int)e.SocketError));
         }
     }
