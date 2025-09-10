@@ -64,4 +64,9 @@ public class TcpSocketClientOptions
     /// Gets or sets the interval, in milliseconds, between reconnection attempts. Default value is 5000.
     /// </summary>
     public int ReconnectInterval { get; set; } = 5000;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the Nagle algorithm is disabled for the socket connection. Default value is true.
+    /// </summary>
+    public bool NoDelay { get; set; } = true;
 }

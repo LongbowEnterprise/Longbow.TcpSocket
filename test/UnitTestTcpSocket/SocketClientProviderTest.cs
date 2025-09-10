@@ -52,6 +52,7 @@ public class SocketClientProviderTest
         Assert.Equal(2, buffer.Length);
 
         await Task.Delay(50);
+        // 远端关闭连接
         buffer = await client.ReceiveAsync();
         Assert.False(client.IsConnected);
     }

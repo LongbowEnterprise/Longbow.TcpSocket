@@ -24,9 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Longbow.Socket.DataAdapters" />
-    <Using Include="Longbow.Socket.DataHandlers" />
-    <Using Include="Longbow.Socket.DataConverters" />
+    <Using Include="Longbow.Sockets.DataAdapters" />
+    <Using Include="Longbow.Sockets.DataHandlers" />
+    <Using Include="Longbow.Sockets.DataConverters" />
     <Using Include="Longbow.TcpSocket" />
     <Using Include="System.Diagnostics.CodeAnalysis"/>
     <Using Include="Xunit"/>
