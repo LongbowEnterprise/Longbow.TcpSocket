@@ -16,6 +16,7 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
     private TcpClient? _tcpClient;
     private Sender? _sender;
+    private Receiver? _receiver;
 
     /// <summary>
     /// <inheritdoc/>
@@ -35,11 +36,13 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         await CloseAsync();
 
         _tcpClient = new TcpClient(LocalEndPoint);
-        _sender = new Sender(_tcpClient.Client);
 
         await _tcpClient.ConnectAsync(endPoint, token).ConfigureAwait(false);
         if (_tcpClient.Connected)
         {
+            _sender = new Sender(_tcpClient.Client);
+            _receiver = new Receiver(_tcpClient.Client);
+
             if (_tcpClient.Client.LocalEndPoint is IPEndPoint localEndPoint)
             {
                 LocalEndPoint = localEndPoint;
@@ -70,8 +73,10 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         var len = 0;
         if (_tcpClient is { Connected: true })
         {
-            var stream = _tcpClient.GetStream();
-            len = await stream.ReadAsync(buffer, token).ConfigureAwait(false);
+            if (_receiver != null)
+            {
+                len = await _receiver.ReceiveAsync(buffer, token);
+            }
 
             if (len == 0)
             {
@@ -96,6 +101,12 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         {
             _sender.Dispose();
             _sender = null;
+        }
+
+        if (_receiver != null)
+        {
+            _receiver.Dispose();
+            _receiver = null!;
         }
 
         return ValueTask.CompletedTask;
