@@ -110,4 +110,4 @@ class MockEntity
 
 ## 📞 联系方式
 
-如需联系开发者，请查看项目主页或提交问题到 [Gitee Issues](https://gitee.com/LongbowEnterprise/Longbow.TcpSocket/issues) 或者 [Github Issues](https://github.com/LongbowEnterprise/Longbow.TcpSocket/issues)。。
+如需联系开发者，请查看项目主页或提交问题到 [Gitee Issues](https://gitee.com/LongbowEnterprise/Longbow.TcpSocket/issues) 或者 [Github Issues](https://github.com/LongbowEnterprise/Longbow.TcpSocket/issues)。
