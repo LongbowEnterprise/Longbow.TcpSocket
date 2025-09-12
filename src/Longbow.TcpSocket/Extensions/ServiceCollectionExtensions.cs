@@ -12,7 +12,7 @@ namespace Longbow.TcpSocket;
 /// TcpSocket 扩展方法
 /// </summary>
 [UnsupportedOSPlatform("browser")]
-public static class TcpSocketExtensions
+public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// 增加 ITcpSocketFactory 服务
@@ -22,7 +22,7 @@ public static class TcpSocketExtensions
     public static IServiceCollection AddTcpSocketFactory(this IServiceCollection services)
     {
         // 添加 ITcpSocketFactory 服务
-        services.AddSingleton<ITcpSocketFactory, DefaultTcpSocketFactory>();
+        services.TryAddSingleton<ITcpSocketFactory, DefaultTcpSocketFactory>();
 
         // 增加 ISocketClientProvider 服务
         services.TryAddTransient<ITcpSocketClientProvider, DefaultTcpSocketClientProvider>();
