@@ -6,11 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Net;
-using System.Runtime.Versioning;
 
 namespace Longbow.TcpSocket;
 
-[UnsupportedOSPlatform("browser")]
 sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServiceProvider, ITcpSocketClient
 {
     /// <summary>
