@@ -75,6 +75,7 @@ sealed class Sender : IDisposable
     /// </summary>
     public void Dispose()
     {
+        _args.Completed -= OnSendCompleted;
         _args.Dispose();
     }
 

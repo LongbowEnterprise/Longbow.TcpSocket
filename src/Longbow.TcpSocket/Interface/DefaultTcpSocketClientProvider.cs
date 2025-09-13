@@ -15,8 +15,6 @@ namespace Longbow.TcpSocket;
 sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
     private TcpClient? _tcpClient;
-    private Sender? _sender;
-    private Receiver? _receiver;
 
     /// <summary>
     /// <inheritdoc/>
@@ -40,9 +38,6 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         await _tcpClient.ConnectAsync(endPoint, token).ConfigureAwait(false);
         if (_tcpClient.Connected)
         {
-            _sender = new Sender(_tcpClient.Client);
-            _receiver = new Receiver(_tcpClient.Client);
-
             if (_tcpClient.Client.LocalEndPoint is IPEndPoint localEndPoint)
             {
                 LocalEndPoint = localEndPoint;
@@ -57,11 +52,13 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
         var ret = false;
-        if (_sender != null)
+        if (_tcpClient is { Connected: true })
         {
-            await _sender.SendAsync(data, token);
+            using var sender = new Sender(_tcpClient.Client);
+            await sender.SendAsync(data, token);
             ret = true;
         }
+
         return ret;
     }
 
@@ -73,16 +70,14 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         var len = 0;
         if (_tcpClient is { Connected: true })
         {
-            if (_receiver != null)
-            {
-                len = await _receiver.ReceiveAsync(buffer, token);
-            }
-
+            using var receiver = new Receiver(_tcpClient.Client);
+            len = await receiver.ReceiveAsync(buffer, token);
             if (len == 0)
             {
                 _tcpClient.Close();
             }
         }
+
         return len;
     }
 
@@ -94,19 +89,8 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         if (_tcpClient != null)
         {
             _tcpClient.Close();
+            _tcpClient.Dispose();
             _tcpClient = null;
-        }
-
-        if (_sender != null)
-        {
-            _sender.Dispose();
-            _sender = null;
-        }
-
-        if (_receiver != null)
-        {
-            _receiver.Dispose();
-            _receiver = null!;
         }
 
         return ValueTask.CompletedTask;
