@@ -75,7 +75,15 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
                 await OnConnecting();
             }
 
-            var connectionToken = GenerateConnectionToken(token);
+            var connectionToken = token;
+            if (options.ConnectTimeout > 0)
+            {
+                // 设置连接超时时间
+                using var connectTokenSource = new CancellationTokenSource(options.ConnectTimeout);
+                using var link = CancellationTokenSource.CreateLinkedTokenSource(token, connectTokenSource.Token);
+                connectionToken = link.Token;
+            }
+
             _socketProvider ??= ServiceProvider.GetRequiredService<ITcpSocketClientProvider>();
             ret = await ConnectCoreAsync(_socketProvider, endPoint, connectionToken);
 
@@ -167,18 +175,6 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
         return ret;
     }
 
-    private CancellationToken GenerateConnectionToken(CancellationToken token)
-    {
-        var connectionToken = token;
-        if (options.ConnectTimeout > 0)
-        {
-            // 设置连接超时时间
-            var connectTokenSource = new CancellationTokenSource(options.ConnectTimeout);
-            connectionToken = CancellationTokenSource.CreateLinkedTokenSource(token, connectTokenSource.Token).Token;
-        }
-        return connectionToken;
-    }
-
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
@@ -200,8 +196,9 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
             if (options.SendTimeout > 0)
             {
                 // 设置发送超时时间
-                var sendTokenSource = new CancellationTokenSource(options.SendTimeout);
-                sendToken = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token).Token;
+                using var sendTokenSource = new CancellationTokenSource(options.SendTimeout);
+                using var link = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token);
+                sendToken = link.Token;
             }
             ret = await _socketProvider.SendAsync(data, sendToken);
         }
@@ -291,8 +288,9 @@ sealed class DefaultTcpSocketClient(TcpSocketClientOptions options) : IServicePr
             if (options.ReceiveTimeout > 0)
             {
                 // 设置接收超时时间
-                var receiveTokenSource = new CancellationTokenSource(options.ReceiveTimeout);
-                receiveToken = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token).Token;
+                using var receiveTokenSource = new CancellationTokenSource(options.ReceiveTimeout);
+                using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
+                receiveToken = link.Token;
             }
 
             len = await client.ReceiveAsync(buffer, receiveToken);
