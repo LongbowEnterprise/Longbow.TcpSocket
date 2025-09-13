@@ -24,7 +24,7 @@ sealed class Receiver : IDisposable
     {
         var state = new ReceiveState();
         var tcs = state.CompletionSource;
-        token.Register(() => tcs.TrySetCanceled());
+        var registration = token.Register(() => tcs.TrySetCanceled());
 
         if (MemoryMarshal.TryGetArray(data, out var segment))
         {
@@ -37,7 +37,7 @@ sealed class Receiver : IDisposable
             _args.SetBuffer(state.Buffer, 0, data.Length);
         }
 
-        _args.UserToken = state;
+        _args.UserToken = (state, registration);
 
         try
         {
@@ -58,7 +58,7 @@ sealed class Receiver : IDisposable
 
     private void OnReceiveCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        var state = (ReceiveState)e.UserToken!;
+        var (state, registration) = ((ReceiveState, CancellationTokenRegistration))e.UserToken!;
 
         try
         {
@@ -84,6 +84,7 @@ sealed class Receiver : IDisposable
         }
         finally
         {
+            registration.Dispose();
             if (e.Buffer != null)
             {
                 ReturnBuffer(e.Buffer);

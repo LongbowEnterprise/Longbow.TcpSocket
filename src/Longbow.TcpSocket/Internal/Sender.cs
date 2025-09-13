@@ -22,9 +22,9 @@ sealed class Sender : IDisposable
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        var tcs = new TaskCompletionSource();
-        token.Register(() => tcs.TrySetCanceled());
         var state = new SendState();
+        var tcs = new TaskCompletionSource();
+        var registration = token.Register(() => tcs.TrySetCanceled());
 
         try
         {
@@ -38,7 +38,7 @@ sealed class Sender : IDisposable
                 _args.SetBuffer(MemoryMarshal.AsMemory(data));
             }
 
-            _args.UserToken = (state, tcs);
+            _args.UserToken = (state, tcs, registration);
 
             if (!_socket.SendAsync(_args))
             {
@@ -56,8 +56,9 @@ sealed class Sender : IDisposable
 
     private void OnSendCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        var (state, tcs) = ((SendState, TaskCompletionSource))e.UserToken!;
+        var (state, tcs, registration) = ((SendState, TaskCompletionSource, CancellationTokenRegistration))e.UserToken!;
         state.Dispose();
+        registration.Dispose();
 
         if (e.SocketError == SocketError.Success)
         {
@@ -75,6 +76,7 @@ sealed class Sender : IDisposable
     /// </summary>
     public void Dispose()
     {
+        _args.Completed -= OnSendCompleted;
         _args.Dispose();
     }
 
