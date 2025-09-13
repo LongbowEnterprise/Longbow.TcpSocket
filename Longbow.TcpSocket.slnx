@@ -1,4 +1,17 @@
 <Solution>
+  <Folder Name="/actions/" />
+  <Folder Name="/actions/ISSUE_TEMPLATE/">
+    <File Path=".github/ISSUE_TEMPLATE/10_bug_report.yml" />
+    <File Path=".github/ISSUE_TEMPLATE/20_feature_request.yml" />
+    <File Path=".github/ISSUE_TEMPLATE/30_documentation.yml" />
+    <File Path=".github/ISSUE_TEMPLATE/40_unit_test.yml" />
+    <File Path=".github/ISSUE_TEMPLATE/50_other.yml" />
+    <File Path=".github/ISSUE_TEMPLATE/60_config.yml" />
+  </Folder>
+  <Folder Name="/actions/workflows/">
+    <File Path=".github/workflows/auto-pull-request-checks.yml" />
+    <File Path=".github/workflows/pack.yml" />
+  </Folder>
   <Folder Name="/docs/">
     <File Path="CHANGELOG.md" />
     <File Path="CHANGELOG.zh-CN.md" />
