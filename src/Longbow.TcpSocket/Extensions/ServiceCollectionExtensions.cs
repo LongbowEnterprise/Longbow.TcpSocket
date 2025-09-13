@@ -11,7 +11,6 @@ namespace Longbow.TcpSocket;
 /// <summary>
 /// TcpSocket 扩展方法
 /// </summary>
-[UnsupportedOSPlatform("browser")]
 public static class ServiceCollectionExtensions
 {
     /// <summary>
@@ -19,6 +18,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services"></param>
     /// <returns></returns>
+    [UnsupportedOSPlatform("browser")]
     public static IServiceCollection AddTcpSocketFactory(this IServiceCollection services)
     {
         // 添加 ITcpSocketFactory 服务

@@ -1,11 +1,20 @@
 <Project>
 
   <PropertyGroup>
-    <PackageIcon>logo.png</PackageIcon>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <PackageReleaseNotes></PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="logo.png" Pack="true" PackagePath="" />
+    <None Include="readme.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!--<PackageIcon>logo.png</PackageIcon>-->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--<None Include="logo.png" Pack="true" PackagePath="" />-->
   </ItemGroup>
 
 </Project>
