@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
-using System.Buffers;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
@@ -22,7 +21,6 @@ sealed class Sender : IDisposable
 
     public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        var state = new SendState();
         var tcs = new TaskCompletionSource();
         var registration = token.Register(() => tcs.TrySetCanceled());
 
@@ -30,7 +28,6 @@ sealed class Sender : IDisposable
         {
             if (MemoryMarshal.TryGetArray(data, out var segment))
             {
-                state.Handle = data.Pin();
                 _args.SetBuffer(segment.Array, segment.Offset, segment.Count);
             }
             else
@@ -38,7 +35,7 @@ sealed class Sender : IDisposable
                 _args.SetBuffer(MemoryMarshal.AsMemory(data));
             }
 
-            _args.UserToken = (state, tcs, registration);
+            _args.UserToken = (tcs, registration);
 
             if (!_socket.SendAsync(_args))
             {
@@ -47,7 +44,6 @@ sealed class Sender : IDisposable
         }
         catch (Exception ex)
         {
-            state.Dispose();
             tcs.SetException(ex);
         }
 
@@ -56,8 +52,7 @@ sealed class Sender : IDisposable
 
     private void OnSendCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        var (state, tcs, registration) = ((SendState, TaskCompletionSource, CancellationTokenRegistration))e.UserToken!;
-        state.Dispose();
+        var (tcs, registration) = ((TaskCompletionSource, CancellationTokenRegistration))e.UserToken!;
         registration.Dispose();
 
         if (e.SocketError == SocketError.Success)
@@ -78,15 +73,5 @@ sealed class Sender : IDisposable
     {
         _args.Completed -= OnSendCompleted;
         _args.Dispose();
-    }
-
-    class SendState : IDisposable
-    {
-        public MemoryHandle Handle { get; set; }
-
-        public void Dispose()
-        {
-            Handle.Dispose();
-        }
     }
 }
