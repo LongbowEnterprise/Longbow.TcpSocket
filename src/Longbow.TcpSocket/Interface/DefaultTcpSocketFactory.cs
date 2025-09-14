@@ -6,7 +6,7 @@ using System.Collections.Concurrent;
 
 namespace Longbow.TcpSocket;
 
-sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFactory
+sealed class DefaultTcpSocketFactory(ITcpSocketClientProvider provider) : ITcpSocketFactory
 {
     private readonly ConcurrentDictionary<string, ITcpSocketClient> _pool = new();
 
@@ -18,7 +18,7 @@ sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFact
     {
         var options = new TcpSocketClientOptions();
         valueFactory?.Invoke(options);
-        return new DefaultTcpSocketClient(options);
+        return new DefaultTcpSocketClient(provider, options);
     }
 
     public ITcpSocketClient? Remove(string name)
