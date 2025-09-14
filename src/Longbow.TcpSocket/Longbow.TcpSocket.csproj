@@ -17,27 +17,23 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net6.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(NET8Version)" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="$(NET8Version)" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net7.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(NET8Version)" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="$(NET8Version)" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(NET9Version)" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="$(NET9Version)" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="$(NET9Version)" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="$(NET9Version)" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Longbow.Sockets" Version="9.*" />
+    <PackageReference Include="Longbow.Sockets" Version="9.0.1" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -53,7 +49,6 @@
     <Using Include="Longbow.Sockets.DataAdapters" />
     <Using Include="Longbow.Sockets.DataHandlers" />
     <Using Include="Longbow.Sockets.DataConverters" />
-    <Using Include="Longbow.Sockets.Logging" />
   </ItemGroup>
 
 </Project>
