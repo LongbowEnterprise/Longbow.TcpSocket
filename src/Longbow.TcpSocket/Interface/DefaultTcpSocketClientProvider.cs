@@ -4,14 +4,12 @@
 
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Versioning;
 
 namespace Longbow.TcpSocket;
 
 /// <summary>
 /// TcpSocket 客户端默认实现
 /// </summary>
-[UnsupportedOSPlatform("browser")]
 sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
     private TcpClient? _tcpClient;

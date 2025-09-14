@@ -5,7 +5,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Reflection;
-using System.Runtime.Versioning;
 using System.Text;
 
 namespace Longbow.TcpSocket;
@@ -13,7 +12,6 @@ namespace Longbow.TcpSocket;
 /// <summary>
 /// <see cref="ITcpSocketClient"/> 扩展方法类
 /// </summary>
-[UnsupportedOSPlatform("browser")]
 public static class ITcpSocketClientExtensions
 {
     /// <summary>

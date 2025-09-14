@@ -4,7 +4,6 @@
 
 using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Versioning;
 
 namespace Longbow.TcpSocket;
 
@@ -27,7 +26,6 @@ public static class TcpSocketUtility
     /// string as an IP address or resolve it as a hostname.</param>
     /// <returns>An <see cref="IPAddress"/> object representing the parsed or resolved IP address. If the input cannot be parsed
     /// or resolved,  the method returns a default IP address.</returns>
-    [UnsupportedOSPlatform("browser")]
     public static IPAddress ConvertToIPAddress(string ipString)
     {
         if (string.IsNullOrEmpty(ipString))
@@ -48,7 +46,6 @@ public static class TcpSocketUtility
     }
 
     [ExcludeFromCodeCoverage]
-    [UnsupportedOSPlatform("browser")]
     private static IPAddress IPAddressByHostName => Dns.GetHostAddresses(Dns.GetHostName(), AddressFamily.InterNetwork).FirstOrDefault() ?? IPAddress.Any;
 
     /// <summary>
@@ -59,7 +56,6 @@ public static class TcpSocketUtility
     /// <param name="port">The port number associated with the endpoint. Must be between 0 and 65535.</param>
     /// <returns>An <see cref="IPEndPoint"/> representing the specified IP address and port.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown if <paramref name="port"/> is less than 0 or greater than 65535.</exception>
-    [UnsupportedOSPlatform("browser")]
     public static IPEndPoint ConvertToIpEndPoint(string ipString, int port)
     {
         if (port < 0 || port > 65535)
