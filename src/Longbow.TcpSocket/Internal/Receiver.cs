@@ -76,7 +76,7 @@ sealed class Receiver : IDisposable
                 // 如果使用了非原始缓冲区，则拷贝数据
                 if (!ReferenceEquals(e.Buffer, state.Buffer))
                 {
-                    new Span<byte>(e.Buffer, e.Offset, e.BytesTransferred).CopyTo(state.Buffer);
+                    new Span<byte>(e.Buffer, e.Offset, e.BytesTransferred).CopyTo(state.Buffer.AsSpan(0, e.BytesTransferred));
                 }
 
                 state.CompletionSource.TrySetResult(e.BytesTransferred);
@@ -85,18 +85,15 @@ sealed class Receiver : IDisposable
         finally
         {
             registration.Dispose();
-            if (e.Buffer != null)
-            {
-                ReturnBuffer(e.Buffer);
-            }
+            ReturnBuffer(e.Buffer);
         }
     }
 
-    private void ReturnBuffer(byte[] buffer)
+    private void ReturnBuffer(byte[]? buffer)
     {
-        if (!ReferenceEquals(buffer, _args.Buffer))
+        if (buffer != null && !ReferenceEquals(buffer, _args.Buffer))
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
         }
     }
 
@@ -107,9 +104,8 @@ sealed class Receiver : IDisposable
 
     sealed class ReceiveState
     {
-        [NotNull]
         public byte[]? Buffer { get; set; }
 
-        public TaskCompletionSource<int> CompletionSource = new();
+        public TaskCompletionSource<int> CompletionSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 }

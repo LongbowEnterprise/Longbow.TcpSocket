@@ -104,7 +104,6 @@ This project is licensed under the [Apache License](LICENSE). Please see the `LI
 ## 🔗 Related Links
 
 - [Github Project Homepage](https://github.com/LongbowEnterprise/Longbow.TcpSocket?wt.mc_id=DT-MVP-5004174)
-- [NuGet Package](https://www.nuget.org/packages/Longbow.TcpSocket?wt.mc_id=DT-MVP-5004174)
 
 ## 📞 Contact
 

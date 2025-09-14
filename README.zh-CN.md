@@ -104,10 +104,9 @@ class MockEntity
 
 ## 🔗 相关链接
 
-- [Gitee 项目主页](https://gitee.com/LongbowEnterprise/Longbow.TcpSocket)
-- [Github 项目主页](https://github.com/LongbowEnterprise/Longbow.TcpSocket)
-- [NuGet 包](https://www.nuget.org/packages/Longbow.TcpSocket)
+- [Github 项目主页](https://github.com/LongbowEnterprise/Longbow.TcpSocket?wt.mc_id=DT-MVP-5004174)
+- [NuGet 包](https://www.nuget.org/packages/Longbow.TcpSocket?wt.mc_id=DT-MVP-5004174)
 
 ## 📞 联系方式
 
-如需联系开发者，请查看项目主页或提交问题到 [Gitee Issues](https://gitee.com/LongbowEnterprise/Longbow.TcpSocket/issues) 或者 [Github Issues](https://github.com/LongbowEnterprise/Longbow.TcpSocket/issues)。
+如需联系开发者，请查看项目主页或提交问题到 [Github Issues](https://github.com/LongbowEnterprise/Longbow.TcpSocket/issues?wt.mc_id=DT-MVP-5004174)。

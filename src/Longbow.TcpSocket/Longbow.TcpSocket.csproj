@@ -7,6 +7,7 @@
   <PropertyGroup>
     <PackageTags>Longbow Socket TcpClient</PackageTags>
     <Description>Longbow extensions of TcpSocket</Description>
+    <DocumentationFile>$(MSBuildProjectName).xml</DocumentationFile>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -37,6 +38,15 @@
 
   <ItemGroup>
     <PackageReference Include="Longbow.Sockets" Version="9.*" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <PackageReleaseNotes></PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="readme.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <ItemGroup>
