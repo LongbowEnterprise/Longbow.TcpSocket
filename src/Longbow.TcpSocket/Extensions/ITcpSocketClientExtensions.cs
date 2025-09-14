@@ -2,9 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using System.Reflection;
 using System.Text;
 
 namespace Longbow.TcpSocket;
@@ -189,11 +186,6 @@ public static class ITcpSocketClientExtensions
     /// Configures the specified <see cref="ITcpSocketClient"/> to use a custom data package adapter and callback
     /// function. 切记使用 <see cref="RemoveDataPackageAdapter"/> 移除数据处理委托防止内存泄露
     /// </summary>
-    /// <remarks>This method sets up the <paramref name="client"/> to use the specified <paramref
-    /// name="adapter"/> for handling incoming data. If the <typeparamref name="TEntity"/> type is decorated with a <see
-    /// cref="DataTypeConverterAttribute"/>, the associated converter is used to transform the data before invoking
-    /// the <paramref name="callback"/>. The callback is called with the converted entity or <see langword="null"/> if
-    /// conversion fails.</remarks>
     /// <typeparam name="TEntity">The type of entity that the data package adapter will handle.</typeparam>
     /// <param name="client">The TCP socket client to configure.</param>
     /// <param name="adapter">The data package adapter responsible for processing incoming data.</param>
@@ -217,19 +209,10 @@ public static class ITcpSocketClientExtensions
 
         client.ReceivedCallback += ReceivedCallback;
 
-        IDataConverter<TEntity>? converter = null;
-
         var type = typeof(TEntity);
-        var converterType = type.GetCustomAttribute<DataTypeConverterAttribute>();
-
-        // 如果类型上有 SocketDataTypeConverterAttribute 特性则使用特性中指定的转换器
-        // 如果没有特性则从 ITcpSocketClient 中的服务容器获取转换器
-        converter = converterType is { Type: not null }
-            ? converterType.Type.CreateInstance<IDataConverter<TEntity>>()
-            : client.GetSocketDataConverter<TEntity>();
 
         // 如果没有设置转换器则使用默认转换器
-        converter ??= new DataConverter<TEntity>();
+        var converter = new DataConverter<TEntity>();
 
         adapter.ReceivedCallBack = async buffer =>
         {
@@ -251,19 +234,5 @@ public static class ITcpSocketClientExtensions
     public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageHandler handler, Func<TEntity?, Task> callback)
     {
         client.AddDataPackageAdapter(new DataPackageAdapter(handler), callback);
-    }
-
-    private static IDataConverter<TEntity>? GetSocketDataConverter<TEntity>(this ITcpSocketClient client)
-    {
-        IDataConverter<TEntity>? converter = null;
-        if (client is IServiceProvider provider)
-        {
-            var converters = provider.GetRequiredService<IOptions<DataConverterCollection>>().Value;
-            if (converters.TryGetTypeConverter<TEntity>(out var v))
-            {
-                converter = v;
-            }
-        }
-        return converter;
     }
 }
