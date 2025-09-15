@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 
@@ -15,6 +16,11 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     private TcpClient? _tcpClient;
     private Sender? _sender;
     private Receiver? _receiver;
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public TcpSocketClientOptions Options { get; } = new();
 
     /// <summary>
     /// <inheritdoc/>
@@ -67,19 +73,20 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public async ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    public async ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default)
     {
-        var len = 0;
+        var data = Memory<byte>.Empty;
         if (_receiver != null)
         {
-            len = await _receiver.ReceiveAsync(buffer, token);
+            using var buffer = MemoryPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
+            var len = await _receiver.ReceiveAsync(buffer.Memory, token);
             if (len == 0)
             {
                 await CloseAsync();
             }
+            data = buffer.Memory[..len];
         }
-
-        return len;
+        return data;
     }
 
     /// <summary>

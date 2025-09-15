@@ -18,7 +18,8 @@ sealed class DefaultTcpSocketFactory(ITcpSocketClientProvider provider) : ITcpSo
     {
         var options = new TcpSocketClientOptions();
         valueFactory?.Invoke(options);
-        return new DefaultTcpSocketClient(provider, options);
+        options.CopyTo(provider.Options);
+        return new DefaultTcpSocketClient(provider);
     }
 
     public ITcpSocketClient? Remove(string name)
