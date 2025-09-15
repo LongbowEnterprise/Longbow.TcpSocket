@@ -51,14 +51,12 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
         var ret = false;
         try
         {
-            await _semaphoreSlimForConnect.WaitAsync(token).ConfigureAwait(false);
-
             if (OnConnecting != null)
             {
                 await OnConnecting();
             }
 
-            await provider.ConnectAsync(endPoint, token);
+            ret = await provider.ConnectAsync(endPoint, token);
 
             if (OnConnected != null)
             {
