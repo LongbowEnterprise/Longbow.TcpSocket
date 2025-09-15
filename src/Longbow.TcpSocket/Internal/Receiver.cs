@@ -19,20 +19,12 @@ sealed class Receiver : IDisposable
         _args.Completed += OnReceiveCompleted;
     }
 
-    public ValueTask<int> ReceiveAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         var tcs = new TaskCompletionSource<int>();
         var registration = token.Register(() => tcs.TrySetCanceled());
 
-        if (MemoryMarshal.TryGetArray(data, out var segment))
-        {
-            _args.SetBuffer(segment.Array, segment.Offset, segment.Count);
-        }
-        else
-        {
-            throw new InvalidOperationException();
-        }
-
+        _args.SetBuffer(buffer);
         _args.UserToken = (tcs, registration);
 
         try
