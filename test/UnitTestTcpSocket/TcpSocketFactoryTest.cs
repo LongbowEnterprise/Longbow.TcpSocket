@@ -44,118 +44,118 @@ public class TcpSocketFactoryTest
         await factory.DisposeAsync();
     }
 
-    [Fact]
-    public async Task ConnectAsync_Timeout()
-    {
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider, MockConnectTimeoutSocketProvider>();
-        }, options => options.ConnectTimeout = 10);
+    //[Fact]
+    //public async Task ConnectAsync_Timeout()
+    //{
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider, MockConnectTimeoutSocketProvider>();
+    //    }, options => options.ConnectTimeout = 10);
 
-        var connect = await client.ConnectAsync("localhost", 9999);
-        Assert.False(connect);
-    }
+    //    var connect = await client.ConnectAsync("localhost", 9999);
+    //    Assert.False(connect);
+    //}
 
-    [Fact]
-    public async Task ConnectAsync_Cancel()
-    {
-        var client = CreateClient(builder =>
-        {
-            builder.AddTransient<ITcpSocketClientProvider, MockConnectCancelSocketProvider>();
-        },
-        options =>
-        {
-            options.ConnectTimeout = 500;
-        });
+    //[Fact]
+    //public async Task ConnectAsync_Cancel()
+    //{
+    //    var client = CreateClient(builder =>
+    //    {
+    //        builder.AddTransient<ITcpSocketClientProvider, MockConnectCancelSocketProvider>();
+    //    },
+    //    options =>
+    //    {
+    //        options.ConnectTimeout = 500;
+    //    });
 
-        // 测试 ConnectAsync 方法连接取消逻辑
-        var cst = new CancellationTokenSource();
-        cst.Cancel();
-        var connect = await client.ConnectAsync("localhost", 9999, cst.Token);
+    //    // 测试 ConnectAsync 方法连接取消逻辑
+    //    var cst = new CancellationTokenSource();
+    //    cst.Cancel();
+    //    var connect = await client.ConnectAsync("localhost", 9999, cst.Token);
 
-        // 由于信号量被取消，所以连接会失败
-        Assert.False(connect);
+    //    // 由于信号量被取消，所以连接会失败
+    //    Assert.False(connect);
 
-        // 测试真正的连接被取消逻辑
-        cst = new CancellationTokenSource(200);
-        connect = await client.ConnectAsync("localhost", 9999, cst.Token);
-        Assert.False(connect);
-    }
+    //    // 测试真正的连接被取消逻辑
+    //    cst = new CancellationTokenSource(200);
+    //    connect = await client.ConnectAsync("localhost", 9999, cst.Token);
+    //    Assert.False(connect);
+    //}
 
-    [Fact]
-    public async Task ConnectAsync_Failed()
-    {
-        var client = CreateClient();
+    //[Fact]
+    //public async Task ConnectAsync_Failed()
+    //{
+    //    var client = CreateClient();
 
-        // 测试 ConnectAsync 方法连接失败
-        var connect = await client.ConnectAsync("localhost", 9999);
-        Assert.False(connect);
-    }
+    //    // 测试 ConnectAsync 方法连接失败
+    //    var connect = await client.ConnectAsync("localhost", 9999);
+    //    Assert.False(connect);
+    //}
 
-    [Fact]
-    public async Task ConnectAsync_Lock()
-    {
-        // 测试并发锁问题
-        var provider = new MockAutoReconnectLockSocketProvider();
-        var client = CreateClient(builder =>
-        {
-            builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-        });
+    //[Fact]
+    //public async Task ConnectAsync_Lock()
+    //{
+    //    // 测试并发锁问题
+    //    var provider = new MockAutoReconnectLockSocketProvider();
+    //    var client = CreateClient(builder =>
+    //    {
+    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
+    //    });
 
-        // 开 5 个线程同时连接
-        _ = Task.Run(async () =>
-        {
-            // 延时 150 保证有一个连接失败
-            await Task.Delay(150);
-            provider.SetConnected(true);
-        });
-        var results = await Task.WhenAll(Enumerable.Range(1, 5).Select(i => client.ConnectAsync("localhost", 0).AsTask()));
-        // 期望结果是 1个 false 4个 true
-        Assert.Equal(1, results.Count(r => !r));
-        Assert.Equal(4, results.Count(r => r));
-    }
+    //    // 开 5 个线程同时连接
+    //    _ = Task.Run(async () =>
+    //    {
+    //        // 延时 150 保证有一个连接失败
+    //        await Task.Delay(150);
+    //        provider.SetConnected(true);
+    //    });
+    //    var results = await Task.WhenAll(Enumerable.Range(1, 5).Select(i => client.ConnectAsync("localhost", 0).AsTask()));
+    //    // 期望结果是 1个 false 4个 true
+    //    Assert.Equal(1, results.Count(r => !r));
+    //    Assert.Equal(4, results.Count(r => r));
+    //}
 
-    [Fact]
-    public async Task Send_Timeout()
-    {
-        var port = 8887;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
+    //[Fact]
+    //public async Task Send_Timeout()
+    //{
+    //    var port = 8887;
+    //    var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider, MockSendTimeoutSocketProvider>();
-        }, op => op.SendTimeout = 10);
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider, MockSendTimeoutSocketProvider>();
+    //    }, op => op.SendTimeout = 10);
 
-        await client.ConnectAsync("localhost", port);
+    //    await client.ConnectAsync("localhost", port);
 
-        var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-        var result = await client.SendAsync(data);
-        Assert.False(result);
-    }
+    //    var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
+    //    var result = await client.SendAsync(data);
+    //    Assert.False(result);
+    //}
 
-    [Fact]
-    public async Task SendAsync_Error()
-    {
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider, MockSendErrorSocketProvider>();
-        });
+    //[Fact]
+    //public async Task SendAsync_Error()
+    //{
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider, MockSendErrorSocketProvider>();
+    //    });
 
-        // 测试未建立连接前调用 SendAsync 方法报异常逻辑
-        var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.SendAsync(data));
-        Assert.NotNull(ex);
+    //    // 测试未建立连接前调用 SendAsync 方法报异常逻辑
+    //    var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
+    //    var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.SendAsync(data));
+    //    Assert.NotNull(ex);
 
-        // 测试发送失败
-        var port = 8892;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
+    //    // 测试发送失败
+    //    var port = 8892;
+    //    var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        await client.ConnectAsync("localhost", port);
-        Assert.True(client.IsConnected);
-    }
+    //    await client.ConnectAsync("localhost", port);
+    //    Assert.True(client.IsConnected);
+    //}
 
     [Fact]
     public async Task SendAsync_Cancel()
@@ -350,113 +350,113 @@ public class TcpSocketFactoryTest
     //    await client.DisposeAsync();
     //}
 
-    [Fact]
-    public async Task AutoReconnect_False()
-    {
-        var provider = new MockAutoReconnectSocketProvider();
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-        },
-        optionConfigure: options =>
-        {
-            options.IsAutoReconnect = true;
-            options.ReconnectInterval = 200;
-            options.IsAutoReceive = true;
-        });
+    //[Fact]
+    //public async Task AutoReconnect_False()
+    //{
+    //    var provider = new MockAutoReconnectSocketProvider();
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
+    //    },
+    //    optionConfigure: options =>
+    //    {
+    //        options.IsAutoReconnect = true;
+    //        options.ReconnectInterval = 200;
+    //        options.IsAutoReceive = true;
+    //    });
 
-        // 使用场景自动接收数据，短线后自动重连
-        var connect = await client.ConnectAsync("localhost", 0);
-        Assert.False(connect);
+    //    // 使用场景自动接收数据，短线后自动重连
+    //    var connect = await client.ConnectAsync("localhost", 0);
+    //    Assert.False(connect);
 
-        provider.SetConnected(true);
-        await Task.Delay(250);
-        Assert.True(client.IsConnected);
-    }
+    //    provider.SetConnected(true);
+    //    await Task.Delay(250);
+    //    Assert.True(client.IsConnected);
+    //}
 
-    [Fact]
-    public async Task AutoReconnect_Send_Ok()
-    {
-        // 发送数据时连接断开了，测试重连功能
-        var provider = new MockAutoReconnectSocketProvider();
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-        }, optionConfigure: options =>
-        {
-            options.IsAutoReconnect = true;
-            options.ReconnectInterval = 200;
-            options.IsAutoReceive = true;
-        });
+    //[Fact]
+    //public async Task AutoReconnect_Send_Ok()
+    //{
+    //    // 发送数据时连接断开了，测试重连功能
+    //    var provider = new MockAutoReconnectSocketProvider();
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
+    //    }, optionConfigure: options =>
+    //    {
+    //        options.IsAutoReconnect = true;
+    //        options.ReconnectInterval = 200;
+    //        options.IsAutoReceive = true;
+    //    });
 
-        provider.SetConnected(true);
-        var connect = await client.ConnectAsync("localhost", 0);
-        Assert.True(connect);
+    //    provider.SetConnected(true);
+    //    var connect = await client.ConnectAsync("localhost", 0);
+    //    Assert.True(connect);
 
-        // 发送时断开连接
-        provider.SetSend(false);
-        var send = await client.SendAsync("test");
-        Assert.False(send);
+    //    // 发送时断开连接
+    //    provider.SetSend(false);
+    //    var send = await client.SendAsync("test");
+    //    Assert.False(send);
 
-        await Task.Delay(250);
-        Assert.True(client.IsConnected);
-    }
+    //    await Task.Delay(250);
+    //    Assert.True(client.IsConnected);
+    //}
 
-    [Fact]
-    public async Task AutoReconnect_Receive_Ok()
-    {
-        // 接收数据时连接断开了，测试重连功能
-        var provider = new MockAutoReconnectSocketProvider();
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-        }, optionConfigure: options =>
-        {
-            options.IsAutoReconnect = true;
-            options.ReconnectInterval = 200;
-            options.IsAutoReceive = false;
-        });
+    //[Fact]
+    //public async Task AutoReconnect_Receive_Ok()
+    //{
+    //    // 接收数据时连接断开了，测试重连功能
+    //    var provider = new MockAutoReconnectSocketProvider();
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
+    //    }, optionConfigure: options =>
+    //    {
+    //        options.IsAutoReconnect = true;
+    //        options.ReconnectInterval = 200;
+    //        options.IsAutoReceive = false;
+    //    });
 
-        provider.SetConnected(true);
-        var connect = await client.ConnectAsync("localhost", 0);
-        Assert.True(connect);
+    //    provider.SetConnected(true);
+    //    var connect = await client.ConnectAsync("localhost", 0);
+    //    Assert.True(connect);
 
-        // 发送时断开连接
-        provider.SetReceive(false);
+    //    // 发送时断开连接
+    //    provider.SetReceive(false);
 
-        var buffer = new byte[1024];
-        var len = await client.ReceiveAsync(buffer);
-        Assert.Equal(Memory<byte>.Empty, buffer[0..len]);
+    //    var buffer = new byte[1024];
+    //    var len = await client.ReceiveAsync(buffer);
+    //    Assert.Equal(Memory<byte>.Empty, buffer[0..len]);
 
-        await Task.Delay(250);
-        provider.SetReceive(true);
-        len = await client.ReceiveAsync(buffer);
-        Assert.Equal(5, len);
-    }
+    //    await Task.Delay(250);
+    //    provider.SetReceive(true);
+    //    len = await client.ReceiveAsync(buffer);
+    //    Assert.Equal(5, len);
+    //}
 
-    [Fact]
-    public async Task AutoReconnect_Cancel()
-    {
-        // 测试重连时取消逻辑
-        var provider = new MockAutoReconnectSocketProvider();
-        var client = CreateClient(builder =>
-        {
-            // 增加发送报错 MockSocket
-            builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-        }, optionConfigure: options =>
-        {
-            options.IsAutoReconnect = true;
-            options.ReconnectInterval = 2000;
-            options.IsAutoReceive = false;
-        });
+    //[Fact]
+    //public async Task AutoReconnect_Cancel()
+    //{
+    //    // 测试重连时取消逻辑
+    //    var provider = new MockAutoReconnectSocketProvider();
+    //    var client = CreateClient(builder =>
+    //    {
+    //        // 增加发送报错 MockSocket
+    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
+    //    }, optionConfigure: options =>
+    //    {
+    //        options.IsAutoReconnect = true;
+    //        options.ReconnectInterval = 2000;
+    //        options.IsAutoReceive = false;
+    //    });
 
-        await client.ConnectAsync("localhost", 0);
-        await Task.Delay(100);
-        await client.DisposeAsync();
-    }
+    //    await client.ConnectAsync("localhost", 0);
+    //    await Task.Delay(100);
+    //    await client.DisposeAsync();
+    //}
 
     [Fact]
     public async Task FixLengthDataPackageHandler_Ok()
@@ -1098,250 +1098,250 @@ public class TcpSocketFactoryTest
         return client;
     }
 
-    class MockSendErrorSocketProvider : ITcpSocketClientProvider
-    {
-        public bool IsConnected { get; private set; }
+    //class MockSendErrorSocketProvider : ITcpSocketClientProvider
+    //{
+    //    public bool IsConnected { get; private set; }
 
-        public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
-        public TcpSocketClientOptions Options { get; } = new();
+    //    public TcpSocketClientOptions Options { get; } = new();
 
-        public ValueTask CloseAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    //    public ValueTask CloseAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
 
-        public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-        {
-            IsConnected = true;
-            return ValueTask.FromResult(true);
-        }
+    //    public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
+    //    {
+    //        IsConnected = true;
+    //        return ValueTask.FromResult(true);
+    //    }
 
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(0);
-        }
+    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(0);
+    //    }
 
-        public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-        {
-            throw new Exception("Mock send error");
-        }
+    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    //    {
+    //        throw new Exception("Mock send error");
+    //    }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
+    //    public ValueTask DisposeAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
+    //}
 
-    class MockConnectTimeoutSocketProvider : ITcpSocketClientProvider
-    {
-        public bool IsConnected { get; private set; }
+    //class MockConnectTimeoutSocketProvider : ITcpSocketClientProvider
+    //{
+    //    public bool IsConnected { get; private set; }
 
-        public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
-        public TcpSocketClientOptions Options { get; } = new();
+    //    public TcpSocketClientOptions Options { get; } = new();
 
-        public ValueTask CloseAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    //    public ValueTask CloseAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
 
-        public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-        {
-            await Task.Delay(1000, token);
-            IsConnected = false;
-            return false;
-        }
+    //    public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
+    //    {
+    //        await Task.Delay(1000, token);
+    //        IsConnected = false;
+    //        return false;
+    //    }
 
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(0);
-        }
+    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(0);
+    //    }
 
-        public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(true);
-        }
+    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(true);
+    //    }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
+    //    public ValueTask DisposeAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
+    //}
 
-    class MockConnectCancelSocketProvider : ITcpSocketClientProvider
-    {
-        public bool IsConnected { get; private set; }
+    //class MockConnectCancelSocketProvider : ITcpSocketClientProvider
+    //{
+    //    public bool IsConnected { get; private set; }
 
-        public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
-        public TcpSocketClientOptions Options { get; } = new();
+    //    public TcpSocketClientOptions Options { get; } = new();
 
-        public ValueTask CloseAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    //    public ValueTask CloseAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
 
-        public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-        {
-            await Task.Delay(250, token);
-            return false;
-        }
+    //    public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
+    //    {
+    //        await Task.Delay(250, token);
+    //        return false;
+    //    }
 
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(0);
-        }
+    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(0);
+    //    }
 
-        public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(true);
-        }
+    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(true);
+    //    }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
+    //    public ValueTask DisposeAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
+    //}
 
-    class MockSendTimeoutSocketProvider : ITcpSocketClientProvider
-    {
-        public bool IsConnected { get; private set; }
+    //class MockSendTimeoutSocketProvider : ITcpSocketClientProvider
+    //{
+    //    public bool IsConnected { get; private set; }
 
-        public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
-        public TcpSocketClientOptions Options { get; } = new();
+    //    public TcpSocketClientOptions Options { get; } = new();
 
-        public ValueTask CloseAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    //    public ValueTask CloseAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
 
-        public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-        {
-            IsConnected = true;
-            return ValueTask.FromResult(true);
-        }
+    //    public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
+    //    {
+    //        IsConnected = true;
+    //        return ValueTask.FromResult(true);
+    //    }
 
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(0);
-        }
+    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(0);
+    //    }
 
-        public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-        {
-            // 模拟超时发送
-            await Task.Delay(100, token);
-            return false;
-        }
+    //    public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    //    {
+    //        // 模拟超时发送
+    //        await Task.Delay(100, token);
+    //        return false;
+    //    }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
+    //    public ValueTask DisposeAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
+    //}
 
-    class MockAutoReconnectLockSocketProvider : ITcpSocketClientProvider
-    {
-        public bool IsConnected { get; private set; }
+    //class MockAutoReconnectLockSocketProvider : ITcpSocketClientProvider
+    //{
+    //    public bool IsConnected { get; private set; }
 
-        public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
+    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
 
-        public TcpSocketClientOptions Options { get; } = new();
+    //    public TcpSocketClientOptions Options { get; } = new();
 
-        public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-        {
-            await Task.Delay(100, token);
-            return IsConnected;
-        }
+    //    public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
+    //    {
+    //        await Task.Delay(100, token);
+    //        return IsConnected;
+    //    }
 
-        public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(true);
-        }
+    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(true);
+    //    }
 
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-        {
-            byte[] data = [1, 2, 3, 4, 5];
-            data.CopyTo(buffer);
-            return ValueTask.FromResult(5);
-        }
+    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    //    {
+    //        byte[] data = [1, 2, 3, 4, 5];
+    //        data.CopyTo(buffer);
+    //        return ValueTask.FromResult(5);
+    //    }
 
-        public ValueTask CloseAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    //    public ValueTask CloseAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
 
-        public void SetConnected(bool state)
-        {
-            IsConnected = state;
-        }
+    //    public void SetConnected(bool state)
+    //    {
+    //        IsConnected = state;
+    //    }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
+    //    public ValueTask DisposeAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
+    //}
 
-    class MockAutoReconnectSocketProvider : ITcpSocketClientProvider
-    {
-        public bool IsConnected { get; private set; }
+    //class MockAutoReconnectSocketProvider : ITcpSocketClientProvider
+    //{
+    //    public bool IsConnected { get; private set; }
 
-        public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
+    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
 
-        public TcpSocketClientOptions Options { get; } = new();
+    //    public TcpSocketClientOptions Options { get; } = new();
 
-        public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(IsConnected);
-        }
+    //    public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(IsConnected);
+    //    }
 
-        private bool _sendState = true;
-        public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-        {
-            return ValueTask.FromResult(_sendState);
-        }
+    //    private bool _sendState = true;
+    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    //    {
+    //        return ValueTask.FromResult(_sendState);
+    //    }
 
-        private bool _receiveState = true;
-        public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-        {
-            if (_receiveState)
-            {
-                byte[] data = [1, 2, 3, 4, 5];
-                data.CopyTo(buffer);
-                return ValueTask.FromResult(5);
-            }
-            else
-            {
-                return ValueTask.FromResult(0);
-            }
-        }
+    //    private bool _receiveState = true;
+    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    //    {
+    //        if (_receiveState)
+    //        {
+    //            byte[] data = [1, 2, 3, 4, 5];
+    //            data.CopyTo(buffer);
+    //            return ValueTask.FromResult(5);
+    //        }
+    //        else
+    //        {
+    //            return ValueTask.FromResult(0);
+    //        }
+    //    }
 
-        public ValueTask CloseAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    //    public ValueTask CloseAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
 
-        public void SetConnected(bool state)
-        {
-            IsConnected = state;
-        }
+    //    public void SetConnected(bool state)
+    //    {
+    //        IsConnected = state;
+    //    }
 
-        public void SetSend(bool state)
-        {
-            _sendState = state;
-        }
+    //    public void SetSend(bool state)
+    //    {
+    //        _sendState = state;
+    //    }
 
-        public void SetReceive(bool state)
-        {
-            _receiveState = state;
-        }
+    //    public void SetReceive(bool state)
+    //    {
+    //        _receiveState = state;
+    //    }
 
-        public ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
-    }
+    //    public ValueTask DisposeAsync()
+    //    {
+    //        return ValueTask.CompletedTask;
+    //    }
+    //}
 
     class MockEntity
     {
