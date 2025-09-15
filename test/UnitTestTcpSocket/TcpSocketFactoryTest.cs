@@ -638,7 +638,7 @@ public class TcpSocketFactoryTest
         Assert.Equal((byte)0x0, entity.Value16);
 
         // null
-        Assert.Equal((byte)0x0, entity.Value17);
+        Assert.Equal((byte)0x1, entity.Value17);
 
         // byte
         Assert.Equal(0x1, entity.Value15);
