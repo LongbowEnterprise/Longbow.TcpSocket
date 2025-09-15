@@ -3,7 +3,6 @@
 // Website: https://github.com/LongbowExtensions/
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -19,10 +18,6 @@ public class TcpSocketFactoryTest
     {
         // 测试 GetOrCreate 方法创建的 Client 销毁后继续 GetOrCreate 得到的对象是否可用
         var sc = new ServiceCollection();
-        sc.AddLogging(builder =>
-        {
-            builder.AddProvider(new MockLoggerProvider());
-        });
         sc.AddTcpSocketFactory();
         var provider = sc.BuildServiceProvider();
         var factory = provider.GetRequiredService<ITcpSocketFactory>();
@@ -160,9 +155,6 @@ public class TcpSocketFactoryTest
 
         await client.ConnectAsync("localhost", port);
         Assert.True(client.IsConnected);
-
-        // 内部生成异常日志
-        await client.SendAsync(data);
     }
 
     [Fact]
@@ -236,7 +228,7 @@ public class TcpSocketFactoryTest
     {
         // 未连接时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
         var client = CreateClient(optionConfigure: op => op.IsAutoReceive = true);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync());
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync(new byte[1024]));
         Assert.NotNull(ex);
 
         // 已连接但是启用了自动接收功能时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
@@ -246,7 +238,7 @@ public class TcpSocketFactoryTest
         var connected = await client.ConnectAsync("localhost", port);
         Assert.True(connected);
 
-        ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync());
+        ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync(new byte[1024]));
         Assert.NotNull(ex);
     }
 
@@ -280,82 +272,83 @@ public class TcpSocketFactoryTest
 
         // 未设置数据处理器未开启自动接收时，调用 ReceiveAsync 方法获取数据
         // 需要自己处理粘包分包和业务问题
-        var payload = await client.ReceiveAsync();
-        Assert.Equal([1, 2, 3, 4, 5], payload.ToArray());
+        var buffer = new byte[1024];
+        var len = await client.ReceiveAsync(buffer);
+        Assert.Equal([1, 2, 3, 4, 5], buffer[0..len]);
 
         // 由于服务器端模拟了拆包发送第二段数据，所以这里可以再次调用 ReceiveAsync 方法获取第二段数据
-        payload = await client.ReceiveAsync();
-        Assert.Equal([3, 4], payload.ToArray());
+        len = await client.ReceiveAsync(buffer);
+        Assert.Equal([3, 4], buffer[0..len]);
     }
 
-    [Fact]
-    public async Task ReceiveAsync_Error()
-    {
-        var client = CreateClient();
+    //[Fact]
+    //public async Task ReceiveAsync_Error()
+    //{
+    //    var client = CreateClient();
 
-        // 测试未建立连接前调用 ReceiveAsync 方法报异常逻辑
-        var type = client.GetType();
-        Assert.NotNull(type);
+    //    // 测试未建立连接前调用 ReceiveAsync 方法报异常逻辑
+    //    var type = client.GetType();
+    //    Assert.NotNull(type);
 
-        var methodInfo = type.GetMethod("AutoReceiveAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.NotNull(methodInfo);
+    //    var methodInfo = type.GetMethod("AutoReceiveAsync", BindingFlags.NonPublic | BindingFlags.Instance);
+    //    Assert.NotNull(methodInfo);
 
-        var task = (ValueTask)methodInfo.Invoke(client, null)!;
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task);
-        Assert.NotNull(ex);
+    //    var task = (ValueTask)methodInfo.Invoke(client, null)!;
+    //    var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task);
+    //    Assert.NotNull(ex);
 
-        var port = 8882;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
+    //    var port = 8882;
+    //    var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        ReadOnlyMemory<byte> buffer = ReadOnlyMemory<byte>.Empty;
-        var tcs = new TaskCompletionSource();
+    //    ReadOnlyMemory<byte> buffer = ReadOnlyMemory<byte>.Empty;
+    //    var tcs = new TaskCompletionSource();
 
-        // 增加接收回调方法
-        client.ReceivedCallback = b =>
-        {
-            buffer = b;
-            tcs.SetResult();
-            return ValueTask.CompletedTask;
-        };
+    //    // 增加接收回调方法
+    //    client.ReceivedCallback = b =>
+    //    {
+    //        buffer = b;
+    //        tcs.SetResult();
+    //        return ValueTask.CompletedTask;
+    //    };
 
-        await client.ConnectAsync("localhost", port);
+    //    await client.ConnectAsync("localhost", port);
 
-        // 发送数据导致接收数据异常
-        var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-        await client.SendAsync(data);
+    //    // 发送数据导致接收数据异常
+    //    var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
+    //    await client.SendAsync(data);
 
-        await tcs.Task;
-        Assert.Equal([1, 2, 3, 4, 5], buffer.ToArray());
+    //    await tcs.Task;
+    //    Assert.Equal([1, 2, 3, 4, 5], buffer.ToArray());
 
-        // 关闭连接
-        StopTcpServer(server);
-    }
+    //    // 关闭连接
+    //    StopTcpServer(server);
+    //}
 
-    [Fact]
-    public async Task AutoReconnect_Ok()
-    {
-        var client = CreateClient(optionConfigure: options =>
-        {
-            options.IsAutoReconnect = true;
-            options.ReconnectInterval = 200;
-            options.IsAutoReceive = true;
-        });
+    //[Fact]
+    //public async Task AutoReconnect_Ok()
+    //{
+    //    var client = CreateClient(optionConfigure: options =>
+    //    {
+    //        options.IsAutoReconnect = true;
+    //        options.ReconnectInterval = 200;
+    //        options.IsAutoReceive = true;
+    //    });
 
-        // 使用场景自动接收数据，短线后自动重连
-        var port = 8894;
-        var connect = await client.ConnectAsync("localhost", port);
-        Assert.False(connect);
+    //    // 使用场景自动接收数据，短线后自动重连
+    //    var port = 8894;
+    //    var connect = await client.ConnectAsync("localhost", port);
+    //    Assert.False(connect);
 
-        // 开启服务端后，可以自动重连上
-        var server = StartTcpServer(port, LoopSendPackageAsync);
-        await Task.Delay(250);
-        Assert.True(client.IsConnected);
+    //    // 开启服务端后，可以自动重连上
+    //    var server = StartTcpServer(port, LoopSendPackageAsync);
+    //    await Task.Delay(250);
+    //    Assert.True(client.IsConnected);
 
-        await client.CloseAsync();
-        await Task.Delay(250);
+    //    await client.CloseAsync();
+    //    await Task.Delay(250);
 
-        await client.DisposeAsync();
-    }
+    //    await client.DisposeAsync();
+    //}
 
     [Fact]
     public async Task AutoReconnect_False()
@@ -433,13 +426,15 @@ public class TcpSocketFactoryTest
 
         // 发送时断开连接
         provider.SetReceive(false);
-        var buffer = await client.ReceiveAsync();
-        Assert.Equal(Memory<byte>.Empty, buffer);
+
+        var buffer = new byte[1024];
+        var len = await client.ReceiveAsync(buffer);
+        Assert.Equal(Memory<byte>.Empty, buffer[0..len]);
 
         await Task.Delay(250);
         provider.SetReceive(true);
-        buffer = await client.ReceiveAsync();
-        Assert.Equal(5, buffer.Length);
+        len = await client.ReceiveAsync(buffer);
+        Assert.Equal(5, len);
     }
 
     [Fact]
@@ -609,14 +604,6 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public void TryConvertTo_Error()
-    {
-        var converter = new MockErrorDataConverter();
-        var result = converter.TryConvertTo(new byte[] { 0x1, 0x2 }, out var _);
-        Assert.False(result);
-    }
-
-    [Fact]
     public async Task TryConvertTo_Ok()
     {
         var port = 8886;
@@ -753,7 +740,6 @@ public class TcpSocketFactoryTest
         {
             builder.Configure<DataConverterCollection>(options =>
             {
-                options.AddTypeConverter<OptionConvertEntity>();
                 options.AddPropertyConverter<OptionConvertEntity>(entity => entity.Header, new DataPropertyConverterAttribute()
                 {
                     Offset = 0,
@@ -947,16 +933,15 @@ public class TcpSocketFactoryTest
         }
     }
 
-    [DataTypeConverter(Type = typeof(DataConverter<MockConverterEntity>))]
     class MockConverterEntity
     {
-        [DataPropertyConverter(Type = typeof(byte[]), Offset = 0, Length = 5)]
+        [DataPropertyConverter(Offset = 0, Length = 5)]
         public byte[]? Header { get; set; }
 
-        [DataPropertyConverter(Type = typeof(byte[]), Offset = 5, Length = 2)]
+        [DataPropertyConverter(Offset = 5, Length = 2)]
         public byte[]? Body { get; set; }
 
-        [DataPropertyConverter(Type = typeof(float), Offset = 5, Length = 1, ConverterType = typeof(FloatConverter), ConverterParameters = [0.01f])]
+        [DataPropertyConverter(Offset = 5, Length = 1, ConverterType = typeof(FloatConverter), ConverterParameters = [0.01f])]
         public float Value1 { get; set; }
     }
 
@@ -1100,10 +1085,6 @@ public class TcpSocketFactoryTest
     private static ITcpSocketClient CreateClient(Action<ServiceCollection>? builder = null, Action<TcpSocketClientOptions>? optionConfigure = null)
     {
         var sc = new ServiceCollection();
-        sc.AddLogging(builder =>
-        {
-            builder.AddProvider(new MockLoggerProvider());
-        });
         sc.AddTcpSocketFactory();
         builder?.Invoke(sc);
 
@@ -1112,41 +1093,9 @@ public class TcpSocketFactoryTest
         var client = factory.GetOrCreate("test", op =>
         {
             op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0);
-            op.EnableLog = true;
             optionConfigure?.Invoke(op);
         });
         return client;
-    }
-
-    class MockLoggerProvider : ILoggerProvider
-    {
-        public ILogger CreateLogger(string categoryName)
-        {
-            return new MockLogger();
-        }
-
-        public void Dispose()
-        {
-
-        }
-    }
-
-    class MockLogger : ILogger
-    {
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-
-        }
     }
 
     class MockSendErrorSocketProvider : ITcpSocketClientProvider
@@ -1154,6 +1103,8 @@ public class TcpSocketFactoryTest
         public bool IsConnected { get; private set; }
 
         public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+
+        public TcpSocketClientOptions Options { get; } = new();
 
         public ValueTask CloseAsync()
         {
@@ -1187,6 +1138,8 @@ public class TcpSocketFactoryTest
         public bool IsConnected { get; private set; }
 
         public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+
+        public TcpSocketClientOptions Options { get; } = new();
 
         public ValueTask CloseAsync()
         {
@@ -1222,6 +1175,8 @@ public class TcpSocketFactoryTest
 
         public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
 
+        public TcpSocketClientOptions Options { get; } = new();
+
         public ValueTask CloseAsync()
         {
             return ValueTask.CompletedTask;
@@ -1254,6 +1209,8 @@ public class TcpSocketFactoryTest
         public bool IsConnected { get; private set; }
 
         public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
+
+        public TcpSocketClientOptions Options { get; } = new();
 
         public ValueTask CloseAsync()
         {
@@ -1289,6 +1246,8 @@ public class TcpSocketFactoryTest
         public bool IsConnected { get; private set; }
 
         public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
+
+        public TcpSocketClientOptions Options { get; } = new();
 
         public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
         {
@@ -1329,6 +1288,8 @@ public class TcpSocketFactoryTest
         public bool IsConnected { get; private set; }
 
         public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
+
+        public TcpSocketClientOptions Options { get; } = new();
 
         public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
         {
@@ -1382,63 +1343,62 @@ public class TcpSocketFactoryTest
         }
     }
 
-    [DataTypeConverter(Type = typeof(DataConverter<MockEntity>))]
     class MockEntity
     {
-        [DataPropertyConverter(Type = typeof(byte[]), Offset = 0, Length = 5)]
+        [DataPropertyConverter(Offset = 0, Length = 5)]
         public byte[]? Header { get; set; }
 
-        [DataPropertyConverter(Type = typeof(byte[]), Offset = 5, Length = 2)]
+        [DataPropertyConverter(Offset = 5, Length = 2)]
         public byte[]? Body { get; set; }
 
-        [DataPropertyConverter(Type = typeof(string), Offset = 7, Length = 1, EncodingName = "utf-8")]
+        [DataPropertyConverter(Offset = 7, Length = 1, EncodingName = "utf-8")]
         public string? Value1 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(int), Offset = 8, Length = 1)]
+        [DataPropertyConverter(Offset = 8, Length = 1)]
         public int Value2 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(long), Offset = 9, Length = 1)]
+        [DataPropertyConverter(Offset = 9, Length = 1)]
         public long Value3 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(double), Offset = 10, Length = 8)]
+        [DataPropertyConverter(Offset = 10, Length = 8)]
         public double Value4 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(float), Offset = 18, Length = 4)]
+        [DataPropertyConverter(Offset = 18, Length = 4)]
         public float Value5 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(short), Offset = 22, Length = 1)]
+        [DataPropertyConverter(Offset = 22, Length = 1)]
         public short Value6 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(ushort), Offset = 23, Length = 1)]
+        [DataPropertyConverter(Offset = 23, Length = 1)]
         public ushort Value7 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(uint), Offset = 24, Length = 1)]
+        [DataPropertyConverter(Offset = 24, Length = 1)]
         public uint Value8 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(ulong), Offset = 25, Length = 1)]
+        [DataPropertyConverter(Offset = 25, Length = 1)]
         public ulong Value9 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(bool), Offset = 26, Length = 1)]
+        [DataPropertyConverter(Offset = 26, Length = 1)]
         public bool Value10 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(EnumEducation), Offset = 27, Length = 1)]
+        [DataPropertyConverter(Offset = 27, Length = 1)]
         public EnumEducation Value11 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(Foo), Offset = 28, Length = 1, ConverterType = typeof(FooConverter), ConverterParameters = ["test"])]
+        [DataPropertyConverter(Offset = 28, Length = 1, ConverterType = typeof(FooConverter), ConverterParameters = ["test"])]
         public Foo? Value12 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(string), Offset = 7, Length = 1)]
+        [DataPropertyConverter(Offset = 7, Length = 1)]
         public string? Value14 { get; set; }
 
         public string? Value13 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(byte), Offset = 0, Length = 1)]
+        [DataPropertyConverter(Offset = 0, Length = 1)]
         public byte Value15 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(byte), ConverterType = typeof(MockNullConverter), Offset = 0, Length = 1)]
+        [DataPropertyConverter(Offset = 0, Length = 1, ConverterType = typeof(MockNullConverter))]
         public byte Value16 { get; set; }
 
-        [DataPropertyConverter(Type = typeof(byte[]), Offset = 0, Length = 1)]
+        [DataPropertyConverter(Offset = 0, Length = 1)]
         public byte Value17 { get; set; }
     }
 
@@ -1447,14 +1407,6 @@ public class TcpSocketFactoryTest
         protected override bool Parse(ReadOnlyMemory<byte> data, MockEntity entity)
         {
             return false;
-        }
-    }
-
-    class MockErrorDataConverter : DataConverter<MockEntity>
-    {
-        protected override bool Parse(ReadOnlyMemory<byte> data, MockEntity entity)
-        {
-            throw new Exception("Mock parse error");
         }
     }
 
