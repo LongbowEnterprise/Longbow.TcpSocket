@@ -17,14 +17,14 @@ namespace Longbow.TcpSocket;
 public interface ITcpSocketClientProvider : IAsyncDisposable
 {
     /// <summary>
-    /// 获得/设置 <see cref="TcpSocketClientOptions"/> 实例
-    /// </summary>
-    TcpSocketClientOptions Options { get; }
-
-    /// <summary>
     /// Gets a value indicating whether the connection is currently active.
     /// </summary>
     bool IsConnected { get; }
+
+    /// <summary>
+    /// 获得/设置 <see cref="TcpSocketClientOptions"/> 实例
+    /// </summary>
+    TcpSocketClientOptions Options { get; }
 
     /// <summary>
     /// Gets the local network endpoint that the socket is bound to.
