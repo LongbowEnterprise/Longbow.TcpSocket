@@ -88,11 +88,11 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default)
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         provider.ThrowIfNotConnected();
 
-        return provider.ReceiveAsync(token);
+        return provider.ReceiveAsync(buffer, token);
     }
 
     /// <summary>

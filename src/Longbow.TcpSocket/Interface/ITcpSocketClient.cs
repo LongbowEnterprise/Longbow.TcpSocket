@@ -69,9 +69,10 @@ public interface ITcpSocketClient : IAsyncDisposable
     /// <summary>
     /// 异步接收方法
     /// </summary>
+    /// <param name="buffer"></param>
     /// <param name="token"></param>
     /// <returns></returns>
-    ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default);
+    ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default);
 
     /// <summary>
     /// Closes the current connection or resource, releasing any associated resources.
