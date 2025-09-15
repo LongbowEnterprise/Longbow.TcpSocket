@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
-using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 
@@ -14,8 +13,6 @@ namespace Longbow.TcpSocket;
 sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
 {
     private TcpClient? _tcpClient;
-    private Sender? _sender;
-    private Receiver? _receiver;
 
     /// <summary>
     /// <inheritdoc/>
@@ -44,9 +41,6 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
         await _tcpClient.ConnectAsync(endPoint, token).ConfigureAwait(false);
         if (_tcpClient.Connected)
         {
-            _sender = new Sender(_tcpClient.Client);
-            _receiver = new Receiver(_tcpClient.Client);
-
             if (_tcpClient.Client.LocalEndPoint is IPEndPoint localEndPoint)
             {
                 LocalEndPoint = localEndPoint;
@@ -61,9 +55,10 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
         var ret = false;
-        if (_sender != null)
+        if (_tcpClient is { Connected: true })
         {
-            await _sender.SendAsync(data, token);
+            using var sender = new Sender(_tcpClient.Client);
+            await sender.SendAsync(data, token);
             ret = true;
         }
 
@@ -73,20 +68,20 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public async ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default)
+    public async ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
     {
-        var data = Memory<byte>.Empty;
-        if (_receiver != null)
+        var len = 0;
+        if (_tcpClient is { Connected: true })
         {
-            using var buffer = MemoryPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
-            var len = await _receiver.ReceiveAsync(buffer.Memory, token);
+            using var receiver = new Receiver(_tcpClient.Client);
+            len = await receiver.ReceiveAsync(buffer, token);
             if (len == 0)
             {
-                await CloseAsync();
+                _tcpClient.Close();
             }
-            data = buffer.Memory[..len];
         }
-        return data;
+
+        return len;
     }
 
     /// <summary>
@@ -94,9 +89,6 @@ sealed class DefaultTcpSocketClientProvider : ITcpSocketClientProvider
     /// </summary>
     public ValueTask CloseAsync()
     {
-        _receiver?.Dispose();
-        _sender?.Dispose();
-
         if (_tcpClient != null)
         {
             _tcpClient.Close();

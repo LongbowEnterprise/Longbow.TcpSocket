@@ -17,6 +17,11 @@ namespace Longbow.TcpSocket;
 public interface ITcpSocketClientProvider : IAsyncDisposable
 {
     /// <summary>
+    /// 获得/设置 <see cref="TcpSocketClientOptions"/> 实例
+    /// </summary>
+    TcpSocketClientOptions Options { get; }
+
+    /// <summary>
     /// Gets a value indicating whether the connection is currently active.
     /// </summary>
     bool IsConnected { get; }
@@ -51,15 +56,11 @@ public interface ITcpSocketClientProvider : IAsyncDisposable
     ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default);
 
     /// <summary>
-    /// Asynchronously receives data from a source and writes it into the specified buffer.
+    /// 异步接收方法
     /// </summary>
-    /// <remarks>This method does not guarantee that the buffer will be completely filled. The caller should
-    /// check the return value to determine the number of bytes received.</remarks>
-    /// <param name="buffer">The memory buffer where the received data will be stored. Must be large enough to hold the incoming data.</param>
-    /// <param name="token">A cancellation token that can be used to cancel the operation. Defaults to <see langword="default"/> if not
-    /// provided.</param>
-    /// <returns>A <see cref="ValueTask{TResult}"/> representing the asynchronous operation. The result is the number of bytes
-    /// successfully received and written into the buffer. Returns 0 if the end of the data stream is reached.</returns>
+    /// <param name="buffer"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
     ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default);
 
     /// <summary>
