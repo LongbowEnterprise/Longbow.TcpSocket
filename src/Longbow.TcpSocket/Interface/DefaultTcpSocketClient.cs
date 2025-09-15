@@ -15,6 +15,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     private IPEndPoint? _localEndPoint;
     private CancellationTokenSource? _autoReceiveTokenSource;
     private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
+    private readonly TcpSocketClientOptions _options = options.Value.CopyTo();
 
     /// <summary>
     /// <inheritdoc/>
@@ -24,7 +25,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public IPEndPoint LocalEndPoint => _localEndPoint ?? options.Value.LocalEndPoint;
+    public IPEndPoint LocalEndPoint => _localEndPoint ?? _options.LocalEndPoint;
 
     /// <summary>
     /// <inheritdoc/>
@@ -44,7 +45,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public TcpSocketClientOptions Options => options.Value;
+    public TcpSocketClientOptions Options => _options;
 
     /// <summary>
     /// <inheritdoc/>
@@ -83,7 +84,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
                 ret = true;
             }
 
-            if (options.Value.IsAutoReceive)
+            if (_options.IsAutoReceive)
             {
                 _ = Task.Run(AutoReceiveAsync, CancellationToken.None).ConfigureAwait(false);
             }
@@ -103,7 +104,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         // 自动接收方法
         _autoReceiveTokenSource ??= new();
 
-        using var block = MemoryPool<byte>.Shared.Rent(options.Value.ReceiveBufferSize);
+        using var block = MemoryPool<byte>.Shared.Rent(_options.ReceiveBufferSize);
         var buffer = block.Memory;
         while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
@@ -116,26 +117,32 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         var len = 0;
         try
         {
-            var receiveToken = token;
-            if (options.Value.ReceiveTimeout > 0)
+            if (_client is { Connected: true })
             {
-                // 设置接收超时时间
-                using var receiveTokenSource = new CancellationTokenSource(options.Value.ReceiveTimeout);
-                using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
-                receiveToken = link.Token;
+                var receiveToken = token;
+                if (_options.ReceiveTimeout > 0)
+                {
+                    // 设置接收超时时间
+                    using var receiveTokenSource = new CancellationTokenSource(_options.ReceiveTimeout);
+                    using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
+                    receiveToken = link.Token;
+                }
+
+                using var receiver = new Receiver(_client!.Client);
+                len = await receiver.ReceiveAsync(buffer, receiveToken);
             }
-
-            using var receiver = new Receiver(_client!.Client);
-            len = await receiver.ReceiveAsync(buffer, receiveToken);
-
+        }
+        catch (OperationCanceledException)
+        {
+            // canceled
+        }
+        finally
+        {
             if (ReceivedCallback != null)
             {
                 // 如果订阅回调则触发回调
                 await ReceivedCallback(buffer[0..len]);
             }
-        }
-        catch (OperationCanceledException)
-        {
         }
         return len;
     }
