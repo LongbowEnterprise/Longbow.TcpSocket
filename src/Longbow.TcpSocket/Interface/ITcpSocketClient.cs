@@ -17,6 +17,11 @@ public interface ITcpSocketClient : IAsyncDisposable
     bool IsConnected { get; }
 
     /// <summary>
+    /// 获得 当前配置 <see cref="TcpSocketClientOptions"/> 实例
+    /// </summary>
+    TcpSocketClientOptions Options { get; }
+
+    /// <summary>
     /// Gets the local network endpoint that the socket is bound to.
     /// </summary>
     /// <remarks>This property provides information about the local endpoint of the socket, which is typically

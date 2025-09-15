@@ -2,21 +2,29 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
+using Microsoft.Extensions.Options;
+using System.Buffers;
 using System.Net;
+using System.Net.Sockets;
 
 namespace Longbow.TcpSocket;
 
-sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSocketClient
+sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : ITcpSocketClient
 {
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
-    public bool IsConnected => provider.IsConnected;
+    private TcpClient? _client;
+    private IPEndPoint? _localEndPoint;
+    private CancellationTokenSource? _autoReceiveTokenSource;
+    private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public IPEndPoint LocalEndPoint => provider.LocalEndPoint;
+    public bool IsConnected => _client?.Connected ?? false;
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public IPEndPoint LocalEndPoint => _localEndPoint ?? options.Value.LocalEndPoint;
 
     /// <summary>
     /// <inheritdoc/>
@@ -33,7 +41,10 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
     /// </summary>
     public Func<Task>? OnConnected { get; set; }
 
-    private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public TcpSocketClientOptions Options => options.Value;
 
     /// <summary>
     /// <inheritdoc/>
@@ -51,16 +62,30 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
         var ret = false;
         try
         {
+            await CloseAsync();
+
             if (OnConnecting != null)
             {
                 await OnConnecting();
             }
 
-            ret = await provider.ConnectAsync(endPoint, token);
+            _client = new();
+            await _client.ConnectAsync(endPoint, token);
 
             if (OnConnected != null)
             {
                 await OnConnected();
+            }
+
+            if (IsConnected)
+            {
+                _localEndPoint = (IPEndPoint?)_client.Client.LocalEndPoint;
+                ret = true;
+            }
+
+            if (options.Value.IsAutoReceive)
+            {
+                _ = Task.Run(AutoReceiveAsync, CancellationToken.None).ConfigureAwait(false);
             }
         }
         finally
@@ -73,32 +98,73 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
         return ret;
     }
 
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
-    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    private async ValueTask AutoReceiveAsync()
     {
-        provider.ThrowIfNotConnected();
+        // 自动接收方法
+        _autoReceiveTokenSource ??= new();
 
-        return provider.SendAsync(data, token);
+        using var block = MemoryPool<byte>.Shared.Rent(options.Value.ReceiveBufferSize);
+        var buffer = block.Memory;
+        while (_autoReceiveTokenSource is { IsCancellationRequested: false })
+        {
+            await ReceiveCoreAsync(block.Memory, _autoReceiveTokenSource.Token);
+        }
+    }
+
+    private async ValueTask<int> ReceiveCoreAsync(Memory<byte> buffer, CancellationToken token)
+    {
+        var len = 0;
+        try
+        {
+            var receiveToken = token;
+            if (options.Value.ReceiveTimeout > 0)
+            {
+                // 设置接收超时时间
+                using var receiveTokenSource = new CancellationTokenSource(options.Value.ReceiveTimeout);
+                using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
+                receiveToken = link.Token;
+            }
+
+            using var receiver = new Receiver(_client!.Client);
+            len = await receiver.ReceiveAsync(buffer, receiveToken);
+
+            if (ReceivedCallback != null)
+            {
+                // 如果订阅回调则触发回调
+                await ReceivedCallback(buffer[0..len]);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        return len;
     }
 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        provider.ThrowIfNotConnected();
-
-        return provider.ReceiveAsync(buffer, token);
+        using var sender = new Sender(_client!.Client);
+        return await sender.SendAsync(data, token);
     }
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default) => ReceiveCoreAsync(buffer, token);
 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
     public ValueTask CloseAsync()
     {
-        return provider.CloseAsync();
+        if (_client != null)
+        {
+            _client.Close();
+            _client = null;
+        }
+        return ValueTask.CompletedTask;
     }
 
     private async ValueTask DisposeAsync(bool disposing)
@@ -106,7 +172,6 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
         if (disposing)
         {
             await CloseAsync();
-            await provider.DisposeAsync();
         }
     }
 
