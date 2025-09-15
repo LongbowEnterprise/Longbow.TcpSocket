@@ -16,6 +16,11 @@ sealed class DefaultTcpSocketClient(ITcpSocketClientProvider provider) : ITcpSoc
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
+    public TcpSocketClientOptions Options => provider.Options;
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
     public IPEndPoint LocalEndPoint => provider.LocalEndPoint;
 
     /// <summary>
