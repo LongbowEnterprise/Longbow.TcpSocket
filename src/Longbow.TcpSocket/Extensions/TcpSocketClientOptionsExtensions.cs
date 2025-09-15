@@ -6,16 +6,16 @@ namespace Longbow.TcpSocket;
 
 static class TcpSocketClientOptionsExtensions
 {
-    public static void CopyTo(this TcpSocketClientOptions source, TcpSocketClientOptions target)
+    public static TcpSocketClientOptions CopyTo(this TcpSocketClientOptions source) => new()
     {
-        target.ReceiveBufferSize = source.ReceiveBufferSize;
-        target.IsAutoReceive = source.IsAutoReceive;
-        target.ConnectTimeout = source.ConnectTimeout;
-        target.SendTimeout = source.SendTimeout;
-        target.ReceiveTimeout = source.ReceiveTimeout;
-        target.LocalEndPoint = source.LocalEndPoint;
-        target.IsAutoReconnect = source.IsAutoReconnect;
-        target.ReconnectInterval = source.ReconnectInterval;
-        target.NoDelay = source.NoDelay;
-    }
+        ReceiveBufferSize = source.ReceiveBufferSize,
+        IsAutoReceive = source.IsAutoReceive,
+        ConnectTimeout = source.ConnectTimeout,
+        SendTimeout = source.SendTimeout,
+        ReceiveTimeout = source.ReceiveTimeout,
+        LocalEndPoint = source.LocalEndPoint,
+        IsAutoReconnect = source.IsAutoReconnect,
+        ReconnectInterval = source.ReconnectInterval,
+        NoDelay = source.NoDelay
+    };
 }

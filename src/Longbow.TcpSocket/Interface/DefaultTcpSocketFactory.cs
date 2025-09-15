@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 
 namespace Longbow.TcpSocket;
 
-sealed class DefaultTcpSocketFactory(IOptions<TcpSocketClientOptions> options) : ITcpSocketFactory
+sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFactory
 {
     private readonly ConcurrentDictionary<string, ITcpSocketClient> _pool = new();
 
@@ -15,10 +15,11 @@ sealed class DefaultTcpSocketFactory(IOptions<TcpSocketClientOptions> options) :
         ? CreateClient(configureOptions)
         : _pool.GetOrAdd(name, key => CreateClient(configureOptions));
 
-    private DefaultTcpSocketClient CreateClient(Action<TcpSocketClientOptions>? configureOptions = null)
+    private ITcpSocketClient CreateClient(Action<TcpSocketClientOptions>? configureOptions = null)
     {
-        configureOptions?.Invoke(options.Value);
-        return new DefaultTcpSocketClient(options);
+        var client = provider.GetRequiredService<ITcpSocketClient>();
+        configureOptions?.Invoke(client.Options);
+        return client;
     }
 
     public ITcpSocketClient? Remove(string name)
