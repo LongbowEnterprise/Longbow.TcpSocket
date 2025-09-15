@@ -42,18 +42,19 @@ public class SocketClientProviderTest
         {
             op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0);
             op.IsAutoReceive = false;
-            op.EnableLog = false;
         });
 
         await client.ConnectAsync("127.0.0.1", port);
         Assert.True(client.IsConnected);
 
-        var buffer = await client.ReceiveAsync();
-        Assert.Equal(2, buffer.Length);
+        var buffer = new byte[1024];
+        var len = await client.ReceiveAsync(buffer);
+        Assert.Equal(2, len);
 
         await Task.Delay(50);
         // 远端关闭连接
-        buffer = await client.ReceiveAsync();
+        var ex = Assert.ThrowsAnyAsync<SocketException>(async () => await client.ReceiveAsync(buffer));
+        Assert.NotNull(ex);
         Assert.False(client.IsConnected);
     }
 
