@@ -109,9 +109,9 @@ public static class ITcpSocketClientExtensions
         {
             foreach (var item in list)
             {
-                item.Key.ReceivedCallback -= callback;
                 foreach (var proxy in item.Value)
                 {
+                    item.Key.ReceivedCallback -= callback;
                     client.ReceivedCallback -= proxy;
                 }
             }
