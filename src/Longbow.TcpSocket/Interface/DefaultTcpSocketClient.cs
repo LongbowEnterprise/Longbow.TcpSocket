@@ -66,6 +66,17 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         {
             await CloseAsync();
 
+            // 并发控制
+            var connectToken = token;
+            if(Options.ConnectTimeout > 0)
+            {
+                // 设置连接超时时间
+                using var connectTokenSource = new CancellationTokenSource(Options.ConnectTimeout);
+                using var link = CancellationTokenSource.CreateLinkedTokenSource(connectToken, connectTokenSource.Token);
+                connectToken = link.Token;
+            }
+            await _semaphoreSlimForConnect.WaitAsync(connectToken).ConfigureAwait(false);
+
             if (OnConnecting != null)
             {
                 await OnConnecting();
