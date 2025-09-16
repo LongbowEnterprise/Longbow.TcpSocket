@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
+using System.Collections.Concurrent;
 using System.Text;
 
 namespace Longbow.TcpSocket;
@@ -46,37 +47,176 @@ public static class ITcpSocketClientExtensions
         return client.ConnectAsync(endPoint, token);
     }
 
+    private static readonly ConcurrentDictionary<Func<ReadOnlyMemory<byte>, ValueTask>, Dictionary<IDataPackageAdapter, List<Func<ReadOnlyMemory<byte>, ValueTask>>>> DataPackageAdapterCache = [];
+
     /// <summary>
-    /// 通过指定 <see cref="IDataPackageHandler"/> 数据处理实例，设置数据适配器并配置回调方法，切记使用 <see cref="ITcpSocketClient.RemoveDataPackageAdapter(Func{ReadOnlyMemory{byte}, ValueTask})"/> 移除数据处理委托防止内存泄露
+    /// 增加数据处理器及其对应的回调方法
     /// </summary>
-    /// <param name="client"><see cref="ITcpSocketClient"/> 实例</param>
-    /// <param name="handler"><see cref="IDataPackageHandler"/> 数据处理实例</param>
-    /// <param name="callback">回调方法</param>
-    public static void AddDataPackageAdapter(this ITcpSocketClient client, IDataPackageHandler handler, Func<ReadOnlyMemory<byte>, ValueTask> callback)
+    /// <param name="client"></param>
+    /// <param name="handler"></param>
+    /// <param name="callback"></param>
+    public static void AddDataPackageAdapter(this ITcpSocketClient client, IDataPackageHandler handler, Func<ReadOnlyMemory<byte>, ValueTask> callback) => client.AddDataPackageAdapter(new DataPackageAdapter(handler), callback);
+
+    /// <summary>
+    /// 增加数据适配器及其对应的回调方法
+    /// </summary>
+    /// <param name="client"></param>
+    /// <param name="adapter"></param>
+    /// <param name="callback"></param>
+    /// <remarks>支持同一个数据处理器 <see cref="IDataPackageAdapter"/> 添加多个回调方法</remarks>
+    public static void AddDataPackageAdapter(this ITcpSocketClient client, IDataPackageAdapter adapter, Func<ReadOnlyMemory<byte>, ValueTask> callback)
     {
-        client.AddDataPackageAdapter(new DataPackageAdapter(handler), callback);
+        async ValueTask Proxy(ReadOnlyMemory<byte> buffer)
+        {
+            // 将接收到的数据传递给 DataPackageAdapter 进行数据处理合规数据触发 ReceivedCallBack 回调
+            await adapter.HandlerAsync(buffer);
+        }
+
+        if (DataPackageAdapterCache.TryGetValue(callback, out var list))
+        {
+            if (list.TryGetValue(adapter, out var items))
+            {
+                items.Add(Proxy);
+            }
+            else
+            {
+                list.TryAdd(adapter, [Proxy]);
+            }
+        }
+        else
+        {
+            var item = new Dictionary<IDataPackageAdapter, List<Func<ReadOnlyMemory<byte>, ValueTask>>>()
+            {
+                { adapter, [Proxy] }
+            };
+            DataPackageAdapterCache.TryAdd(callback, item);
+        }
+
+        client.ReceivedCallback += Proxy;
+
+        // 设置 DataPackageAdapter 的回调函数
+        adapter.ReceivedCallback += callback;
     }
 
     /// <summary>
-    /// 通过指定 <see cref="IDataPackageHandler"/> 数据处理实例，设置数据适配器并配置回调方法。切记使用 <see cref="ITcpSocketClient.RemoveDataPackageAdapter(Func{ReadOnlyMemory{byte}, ValueTask})"/> 移除数据处理委托防止内存泄露
+    /// 移除 <see cref="ITcpSocketClient"/> 数据适配器及其对应的回调方法
     /// </summary>
-    /// <param name="client"><see cref="ITcpSocketClient"/> 实例</param>
-    /// <param name="handler"><see cref="IDataPackageHandler"/> 数据处理实例</param>
-    /// <param name="callback">回调方法</param>
-    public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageHandler handler, Func<TEntity?, ValueTask> callback)
+    /// <param name="client"></param>
+    /// <param name="callback"></param>
+    public static void RemoveDataPackageAdapter(this ITcpSocketClient client, Func<ReadOnlyMemory<byte>, ValueTask> callback)
     {
-        client.AddDataPackageAdapter(new DataPackageAdapter(handler), callback);
+        if (DataPackageAdapterCache.TryRemove(callback, out var list))
+        {
+            foreach (var item in list)
+            {
+                item.Key.ReceivedCallback -= callback;
+                foreach (var proxy in item.Value)
+                {
+                    client.ReceivedCallback -= proxy;
+                }
+            }
+        }
+    }
+
+    private static readonly ConcurrentDictionary<Delegate, Dictionary<IDataPackageAdapter, List<(Func<ReadOnlyMemory<byte>, ValueTask> Proxy, Func<ReadOnlyMemory<byte>, ValueTask> AdapterProxy)>>> DataPackageAdapterEntityCache = [];
+
+    /// <summary>
+    /// 增加数据处理器及其对应的回调方法
+    /// </summary>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <param name="client"></param>
+    /// <param name="handler"></param>
+    /// <param name="callback"></param>
+    public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageHandler handler, Func<TEntity?, ValueTask> callback) => client.AddDataPackageAdapter(new DataPackageAdapter(handler), callback);
+
+    /// <summary>
+    /// 增加数据处理器及其对应的回调方法
+    /// </summary>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <param name="client"></param>
+    /// <param name="handler"></param>
+    /// <param name="converter"></param>
+    /// <param name="callback"></param>
+    public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageHandler handler, IDataConverter<TEntity> converter, Func<TEntity?, ValueTask> callback) => client.AddDataPackageAdapter(new DataPackageAdapter(handler), converter, callback);
+
+    /// <summary>
+    /// 增加数据适配器及其对应的回调方法
+    /// </summary>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <param name="client"></param>
+    /// <param name="adapter"></param>
+    /// <param name="callback"></param>
+    public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageAdapter adapter, Func<TEntity?, ValueTask> callback)
+    {
+        var converter = new DataConverter<TEntity>();
+        client.AddDataPackageAdapter(adapter, converter, callback);
     }
 
     /// <summary>
-    /// 通过指定 <see cref="IDataPackageHandler"/> 数据处理实例，设置数据适配器并配置回调方法。切记使用 <see cref="ITcpSocketClient.RemoveDataPackageAdapter(Func{ReadOnlyMemory{byte}, ValueTask})"/> 移除数据处理委托防止内存泄露
+    /// <inheritdoc/>
     /// </summary>
-    /// <param name="client"><see cref="ITcpSocketClient"/> 实例</param>
-    /// <param name="handler"><see cref="IDataPackageHandler"/> 数据处理实例</param>
-    /// <param name="converter"><see cref="IDataConverter{TEntity}"/>实例</param>
-    /// <param name="callback">回调方法</param>
-    public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageHandler handler, IDataConverter<TEntity> converter, Func<TEntity?, ValueTask> callback)
+    public static void AddDataPackageAdapter<TEntity>(this ITcpSocketClient client, IDataPackageAdapter adapter, IDataConverter<TEntity> converter, Func<TEntity?, ValueTask> callback)
     {
-        client.AddDataPackageAdapter(new DataPackageAdapter(handler), converter, callback);
+        async ValueTask Proxy(ReadOnlyMemory<byte> buffer)
+        {
+            // 将接收到的数据传递给 DataPackageAdapter 进行数据处理合规数据触发 ReceivedCallBack 回调
+            await adapter.HandlerAsync(buffer);
+        }
+
+        async ValueTask AdapterProxy(ReadOnlyMemory<byte> buffer)
+        {
+            TEntity? ret = default;
+            if (converter.TryConvertTo(buffer, out var t))
+            {
+                ret = t;
+            }
+            await callback(ret);
+        }
+
+        if (DataPackageAdapterEntityCache.TryGetValue(callback, out var list))
+        {
+            if (list.TryGetValue(adapter, out var items))
+            {
+                items.Add((Proxy, AdapterProxy));
+            }
+            else
+            {
+                list.TryAdd(adapter, [(Proxy, AdapterProxy)]);
+            }
+        }
+        else
+        {
+            var item = new Dictionary<IDataPackageAdapter, List<(Func<ReadOnlyMemory<byte>, ValueTask>, Func<ReadOnlyMemory<byte>, ValueTask>)>>()
+            {
+                { adapter, [(Proxy, AdapterProxy)] }
+            };
+            DataPackageAdapterEntityCache.TryAdd(callback, item);
+        }
+
+        client.ReceivedCallback += Proxy;
+
+        // 设置 DataPackageAdapter 的回调函数
+        adapter.ReceivedCallback = AdapterProxy;
+    }
+
+    /// <summary>
+    /// 移除 <see cref="ITcpSocketClient"/> 数据适配器及其对应的回调方法
+    /// </summary>
+    /// <param name="client"></param>
+    /// <param name="callback"></param>
+    public static void RemoveDataPackageAdapter<TEntity>(this ITcpSocketClient client, Func<TEntity?, ValueTask> callback)
+    {
+        if (DataPackageAdapterEntityCache.TryRemove(callback, out var list))
+        {
+            foreach (var item in list)
+            {
+                var adapter = item.Key;
+                foreach (var (proxy, adapterProxy) in item.Value)
+                {
+                    client.ReceivedCallback -= proxy;
+                    adapter.ReceivedCallback -= adapterProxy;
+                }
+            }
+        }
     }
 }

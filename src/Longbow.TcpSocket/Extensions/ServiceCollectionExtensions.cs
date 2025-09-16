@@ -33,16 +33,4 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
-
-    /// <summary>
-    /// 配置第三方数据模型与 <see cref="DataConverterCollection"/> 数据转换器集合配置扩展方法
-    /// </summary>
-    /// <param name="services"></param>
-    /// <param name="configureOptions"></param>
-    /// <returns></returns>
-    public static IServiceCollection ConfigureDataConverters(this IServiceCollection services, Action<DataConverterCollection> configureOptions)
-    {
-        services.Configure(configureOptions);
-        return services;
-    }
 }
