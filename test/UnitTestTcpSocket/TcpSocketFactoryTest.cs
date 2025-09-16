@@ -5,7 +5,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Text;
 
 namespace UnitTestTcpSocket;
@@ -17,7 +16,10 @@ public class TcpSocketFactoryTest
     {
         // 测试 GetOrCreate 方法创建的 Client 销毁后继续 GetOrCreate 得到的对象是否可用
         var sc = new ServiceCollection();
-        sc.AddTcpSocketFactory();
+        sc.AddTcpSocketFactory(op =>
+        {
+            op.ConnectTimeout = 1000;
+        });
         var provider = sc.BuildServiceProvider();
         var factory = provider.GetRequiredService<ITcpSocketFactory>();
         var client1 = factory.GetOrCreate("demo");
@@ -39,6 +41,9 @@ public class TcpSocketFactoryTest
 
         await using var client6 = factory.GetOrCreate();
         Assert.NotEqual(client5, client6);
+
+        await using var client7 = factory.GetOrCreate("");
+        Assert.NotEqual(client7, client6);
 
         await client5.DisposeAsync();
         await factory.DisposeAsync();
