@@ -10,23 +10,6 @@ namespace UnitTestTcpSocket;
 
 public class SocketClientProviderTest
 {
-    //[Fact]
-    //public async Task DefaultSocketClient_Ok()
-    //{
-    //    var sc = new ServiceCollection();
-    //    sc.AddTcpSocketFactory();
-    //    var provider = sc.BuildServiceProvider();
-    //    var clientProvider = provider.GetRequiredService<ITcpSocketClientProvider>();
-
-    //    // 未建立连接时 IsConnected 应为 false
-    //    Assert.False(clientProvider.IsConnected);
-
-    //    // 未建立连接直接调用 ReceiveAsync 方法
-    //    var buffer = new byte[1024];
-    //    var len = await clientProvider.ReceiveAsync(buffer);
-    //    Assert.Equal(0, len);
-    //}
-
     [Fact]
     public async Task ReceiveAsync_Ok()
     {
