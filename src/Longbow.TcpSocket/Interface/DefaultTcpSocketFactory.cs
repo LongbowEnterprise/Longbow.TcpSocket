@@ -11,9 +11,11 @@ sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFact
 {
     private readonly ConcurrentDictionary<string, ITcpSocketClient> _pool = new();
 
-    public ITcpSocketClient GetOrCreate(string? name = null, Action<TcpSocketClientOptions>? configureOptions = null) => string.IsNullOrEmpty(name)
+    public ITcpSocketClient GetOrCreate(string name, Action<TcpSocketClientOptions>? configureOptions = null) => string.IsNullOrEmpty(name)
         ? CreateClient(configureOptions)
         : _pool.GetOrAdd(name, key => CreateClient(configureOptions));
+
+    public ITcpSocketClient GetOrCreate(Action<TcpSocketClientOptions>? configureOptions = null) => CreateClient(configureOptions);
 
     private ITcpSocketClient CreateClient(Action<TcpSocketClientOptions>? configureOptions = null)
     {

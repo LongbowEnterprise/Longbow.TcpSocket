@@ -17,7 +17,16 @@ public interface ITcpSocketFactory : IAsyncDisposable
     /// already exist. This delegate is invoked only when a new client is created.</param>
     /// <returns>An instance of <see cref="ITcpSocketClient"/> corresponding to the specified name. If the client already exists,
     /// the existing instance is returned; otherwise, a new instance is created and returned.</returns>
-    ITcpSocketClient GetOrCreate(string? name = null, Action<TcpSocketClientOptions>? configureOptions = null);
+    ITcpSocketClient GetOrCreate(string name, Action<TcpSocketClientOptions>? configureOptions = null);
+
+    /// <summary>
+    /// Retrieves an existing TCP socket client by name or creates a new one using the specified configuration.
+    /// </summary>
+    /// <param name="configureOptions">A delegate used to configure the <see cref="TcpSocketClientOptions"/> for the new TCP socket client if it does not
+    /// already exist. This delegate is invoked only when a new client is created.</param>
+    /// <returns>An instance of <see cref="ITcpSocketClient"/> corresponding to the specified name. If the client already exists,
+    /// the existing instance is returned; otherwise, a new instance is created and returned.</returns>
+    ITcpSocketClient GetOrCreate(Action<TcpSocketClientOptions>? configureOptions = null);
 
     /// <summary>
     /// Removes the TCP socket client associated with the specified name.
