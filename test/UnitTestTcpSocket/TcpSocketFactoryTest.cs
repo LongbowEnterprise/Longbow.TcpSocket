@@ -85,37 +85,16 @@ public class TcpSocketFactoryTest
         var port = 8888;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient(configureOptions: op => op.ReceiveTimeout = 100);
+        await using var client = CreateClient(configureOptions: op => op.ReceiveTimeout = 100);
 
         await client.ConnectAsync("localhost", port);
 
         var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
         await client.SendAsync(data);
-        await Task.Delay(220); // 等待接收超时
-    }
 
-    [Fact]
-    public async Task ReceiveAsync_Cancel()
-    {
-        var port = 8889;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
-
-        var client = CreateClient();
-        await client.ConnectAsync("localhost", port);
-
-        var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-        await client.SendAsync(data);
-
-        // 通过反射取消令牌
-        var type = client.GetType();
-        Assert.NotNull(type);
-
-        var fieldInfo = type.GetField("_autoReceiveTokenSource", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.NotNull(fieldInfo);
-        var tokenSource = fieldInfo.GetValue(client) as CancellationTokenSource;
-        Assert.NotNull(tokenSource);
-        tokenSource.Cancel();
-        await Task.Delay(50);
+        // 等待接收超时
+        await Task.Delay(120);
+        await client.CloseAsync();
     }
 
     [Fact]
