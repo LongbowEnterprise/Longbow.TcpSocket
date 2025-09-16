@@ -86,4 +86,39 @@ public interface ITcpSocketClient : IAsyncDisposable
     /// operations  are completed before calling this method. This method is typically used to clean up resources when
     /// they  are no longer needed.</remarks>
     ValueTask CloseAsync();
+
+    /// <summary>
+    /// 增加数据包适配器
+    /// </summary>
+    /// <param name="adapter"></param>
+    /// <param name="callback"></param>
+    void AddDataPackageAdapter(IDataPackageAdapter adapter, Func<ReadOnlyMemory<byte>, ValueTask> callback);
+
+    /// <summary>
+    /// 增加数据包适配器直接转化成实体类
+    /// </summary>
+    /// <param name="adapter"></param>
+    /// <param name="callback"></param>
+    void AddDataPackageAdapter<TEntity>(IDataPackageAdapter adapter, Func<TEntity?, ValueTask> callback);
+
+    /// <summary>
+    /// 移除数据包适配器
+    /// </summary>
+    /// <param name="callback"></param>
+    void RemoveDataPackageAdapter(Func<ReadOnlyMemory<byte>, ValueTask> callback);
+
+    /// <summary>
+    /// 增加数据包适配器通过指定 <see cref="IDataConverter{TEntity}"/> 转成实体类
+    /// </summary>
+    /// <param name="adapter"></param>
+    /// <param name="converter"></param>
+    /// <param name="callback"></param>
+    void AddDataPackageAdapter<TEntity>(IDataPackageAdapter adapter, IDataConverter<TEntity> converter, Func<TEntity?, ValueTask> callback);
+
+    /// <summary>
+    /// 移除数据包适配器
+    /// </summary>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <param name="callback"></param>
+    void RemoveDataPackageAdapter<TEntity>(Func<TEntity?, ValueTask> callback);
 }
