@@ -68,7 +68,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
 
             // 并发控制
             var connectToken = token;
-            if(Options.ConnectTimeout > 0)
+            if (Options.ConnectTimeout > 0)
             {
                 // 设置连接超时时间
                 using var connectTokenSource = new CancellationTokenSource(Options.ConnectTimeout);
@@ -178,6 +178,13 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// </summary>
     public ValueTask CloseAsync()
     {
+        if (_autoReceiveTokenSource != null)
+        {
+            _autoReceiveTokenSource.Cancel();
+            _autoReceiveTokenSource.Dispose();
+            _autoReceiveTokenSource = null;
+        }
+
         if (_client != null)
         {
             _client.Close();
