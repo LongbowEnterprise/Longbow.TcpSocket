@@ -17,6 +17,11 @@ public interface ITcpSocketClient : IAsyncDisposable
     bool IsConnected { get; }
 
     /// <summary>
+    /// 获得 当前配置 <see cref="TcpSocketClientOptions"/> 实例
+    /// </summary>
+    TcpSocketClientOptions Options { get; }
+
+    /// <summary>
     /// Gets the local network endpoint that the socket is bound to.
     /// </summary>
     /// <remarks>This property provides information about the local endpoint of the socket, which is typically
@@ -67,15 +72,12 @@ public interface ITcpSocketClient : IAsyncDisposable
     ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default);
 
     /// <summary>
-    /// Asynchronously receives a block of data from the underlying source.
+    /// 异步接收方法
     /// </summary>
-    /// <remarks>This method is non-blocking and completes when data is available or the operation is
-    /// canceled. If the operation is canceled, the returned task will be in a faulted state with a <see
-    /// cref="OperationCanceledException"/>.</remarks>
-    /// <param name="token">A cancellation token that can be used to cancel the operation. The default value is <see langword="default"/>.</param>
-    /// <returns>A <see cref="ValueTask{TResult}"/> containing a <see cref="Memory{T}"/> of bytes representing the received data.
-    /// The returned memory may be empty if no data is available.</returns>
-    ValueTask<Memory<byte>> ReceiveAsync(CancellationToken token = default);
+    /// <param name="buffer"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default);
 
     /// <summary>
     /// Closes the current connection or resource, releasing any associated resources.

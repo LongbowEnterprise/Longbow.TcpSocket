@@ -8,7 +8,6 @@ namespace UnitTestTcpSocket;
 
 public class TcpSocketUtilityTest
 {
-
     [Fact]
     public void ConvertToIPAddress_Ok()
     {

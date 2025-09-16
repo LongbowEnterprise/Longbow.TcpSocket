@@ -17,28 +17,20 @@ public static class ServiceCollectionExtensions
     /// 增加 ITcpSocketFactory 服务
     /// </summary>
     /// <param name="services"></param>
+    /// <param name="configureOptions"></param>
     /// <returns></returns>
     [UnsupportedOSPlatform("browser")]
-    public static IServiceCollection AddTcpSocketFactory(this IServiceCollection services)
+    public static IServiceCollection AddTcpSocketFactory(this IServiceCollection services, Action<TcpSocketClientOptions>? configureOptions = null)
     {
         // 添加 ITcpSocketFactory 服务
         services.TryAddSingleton<ITcpSocketFactory, DefaultTcpSocketFactory>();
 
         // 增加 ISocketClientProvider 服务
-        services.TryAddTransient<ITcpSocketClientProvider, DefaultTcpSocketClientProvider>();
+        services.TryAddTransient<ITcpSocketClient, DefaultTcpSocketClient>();
 
-        return services;
-    }
+        // 增加全局配置
+        services.Configure<TcpSocketClientOptions>(op => configureOptions?.Invoke(op));
 
-    /// <summary>
-    /// 配置第三方数据模型与 <see cref="DataConverterCollection"/> 数据转换器集合配置扩展方法
-    /// </summary>
-    /// <param name="services"></param>
-    /// <param name="configureOptions"></param>
-    /// <returns></returns>
-    public static IServiceCollection ConfigureDataConverters(this IServiceCollection services, Action<DataConverterCollection> configureOptions)
-    {
-        services.Configure(configureOptions);
         return services;
     }
 }

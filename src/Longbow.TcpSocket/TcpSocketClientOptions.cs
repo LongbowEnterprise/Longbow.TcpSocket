@@ -51,11 +51,6 @@ public class TcpSocketClientOptions
     public IPEndPoint LocalEndPoint { get; set; } = new(IPAddress.Any, 0);
 
     /// <summary>
-    /// Gets or sets a value indicating whether logging is enabled. Default value is false.
-    /// </summary>
-    public bool EnableLog { get; set; }
-
-    /// <summary>
     /// Gets or sets a value indicating whether the system should automatically attempt to reconnect  after a connection is lost. Default value is false.
     /// </summary>
     public bool IsAutoReconnect { get; set; }
@@ -66,7 +61,7 @@ public class TcpSocketClientOptions
     public int ReconnectInterval { get; set; } = 5000;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the Nagle algorithm is disabled for the socket connection. Default value is true.
+    /// Gets or sets a value indicating whether the Nagle algorithm is disabled for the socket connection. Default value is false.
     /// </summary>
-    public bool NoDelay { get; set; } = true;
+    public bool NoDelay { get; set; }
 }

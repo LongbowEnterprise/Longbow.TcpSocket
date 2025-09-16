@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
-using System.Buffers;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
@@ -20,49 +19,32 @@ sealed class Sender : IDisposable
         _args.Completed += OnSendCompleted;
     }
 
-    public ValueTask SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        var state = new SendState();
-        var tcs = new TaskCompletionSource();
+        var tcs = new TaskCompletionSource<bool>();
         var registration = token.Register(() => tcs.TrySetCanceled());
 
-        try
+        if (MemoryMarshal.TryGetArray(data, out var segment))
         {
-            if (MemoryMarshal.TryGetArray(data, out var segment))
-            {
-                state.Handle = data.Pin();
-                _args.SetBuffer(segment.Array, segment.Offset, segment.Count);
-            }
-            else
-            {
-                _args.SetBuffer(MemoryMarshal.AsMemory(data));
-            }
-
-            _args.UserToken = (state, tcs, registration);
+            _args.UserToken = (tcs, registration);
+            _args.SetBuffer(segment.Array, segment.Offset, segment.Count);
 
             if (!_socket.SendAsync(_args))
             {
                 OnSendCompleted(null, _args);
             }
         }
-        catch (Exception ex)
-        {
-            state.Dispose();
-            tcs.SetException(ex);
-        }
-
-        return new ValueTask(tcs.Task);
+        return new ValueTask<bool>(tcs.Task);
     }
 
     private void OnSendCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        var (state, tcs, registration) = ((SendState, TaskCompletionSource, CancellationTokenRegistration))e.UserToken!;
-        state.Dispose();
+        var (tcs, registration) = ((TaskCompletionSource<bool>, CancellationTokenRegistration))e.UserToken!;
         registration.Dispose();
 
         if (e.SocketError == SocketError.Success)
         {
-            tcs.TrySetResult();
+            tcs.TrySetResult(true);
         }
         else
         {
@@ -78,15 +60,5 @@ sealed class Sender : IDisposable
     {
         _args.Completed -= OnSendCompleted;
         _args.Dispose();
-    }
-
-    class SendState : IDisposable
-    {
-        public MemoryHandle Handle { get; set; }
-
-        public void Dispose()
-        {
-            Handle.Dispose();
-        }
     }
 }

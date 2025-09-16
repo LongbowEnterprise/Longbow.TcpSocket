@@ -3,39 +3,24 @@
 // Website: https://github.com/LongbowExtensions/
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Runtime.Versioning;
 
 namespace Longbow.TcpSocket;
 
-[UnsupportedOSPlatform("browser")]
 sealed class DefaultTcpSocketFactory(IServiceProvider provider) : ITcpSocketFactory
 {
     private readonly ConcurrentDictionary<string, ITcpSocketClient> _pool = new();
 
-    public ITcpSocketClient GetOrCreate(string? name = null, Action<TcpSocketClientOptions>? valueFactory = null)
-    {
-        if (!SocketLogging.Inited)
-        {
-            var logger = provider.GetService<ILogger<DefaultTcpSocketFactory>>();
-            if (logger != null)
-            {
-                SocketLogging.Init(logger);
-            }
-        }
+    public ITcpSocketClient GetOrCreate(string name, Action<TcpSocketClientOptions>? configureOptions = null) => string.IsNullOrEmpty(name)
+        ? CreateClient(configureOptions)
+        : _pool.GetOrAdd(name, key => CreateClient(configureOptions));
 
-        return string.IsNullOrEmpty(name) ? CreateClient(valueFactory) : _pool.GetOrAdd(name, key => CreateClient(valueFactory));
-    }
+    public ITcpSocketClient GetOrCreate(Action<TcpSocketClientOptions>? configureOptions = null) => CreateClient(configureOptions);
 
-    private DefaultTcpSocketClient CreateClient(Action<TcpSocketClientOptions>? valueFactory = null)
+    private ITcpSocketClient CreateClient(Action<TcpSocketClientOptions>? configureOptions = null)
     {
-        var options = new TcpSocketClientOptions();
-        valueFactory?.Invoke(options);
-        var client = new DefaultTcpSocketClient(options)
-        {
-            ServiceProvider = provider,
-        };
+        var client = provider.GetRequiredService<ITcpSocketClient>();
+        configureOptions?.Invoke(client.Options);
         return client;
     }
 
