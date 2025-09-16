@@ -45,7 +45,7 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task SendAsync_Cancel()
+    public async Task SendAsync_Ok()
     {
         var port = 8881;
         var server = StartTcpServer(port, MockSplitPackageAsync);
@@ -64,6 +64,12 @@ public class TcpSocketFactoryTest
 
         var ex = Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await client.SendAsync("test", null, cst.Token));
         Assert.NotNull(ex);
+
+        // 测试正常电文
+        cst.Dispose();
+        cst = new();
+        var result = await client.SendAsync("test", null, cst.Token);
+        Assert.True(result);
 
         // 关闭连接
         StopTcpServer(server);
@@ -415,7 +421,7 @@ public class TcpSocketFactoryTest
         await tcs.Task;
         Assert.NotNull(noConvertEntity);
 
-        var converter = new MockSocketDataConverter(new DataConverterCollection());
+        var converter = new MockSocketDataConverter();
         var result = converter.TryConvertTo(new byte[] { 0x1, 0x2 }, out var t);
         Assert.False(result);
 
@@ -429,22 +435,7 @@ public class TcpSocketFactoryTest
         var port = 8895;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient(builder =>
-        {
-            builder.Configure<DataConverterCollection>(options =>
-            {
-                options.AddPropertyConverter<OptionConvertEntity>(entity => entity.Header, new DataPropertyConverterAttribute()
-                {
-                    Offset = 0,
-                    Length = 2
-                });
-                options.AddPropertyConverter<OptionConvertEntity>(entity => entity.Body, new DataPropertyConverterAttribute()
-                {
-                    Offset = 2,
-                    Length = 3
-                });
-            });
-        });
+        var client = CreateClient();
         var tcs = new TaskCompletionSource();
         var receivedBuffer = new byte[128];
 
@@ -581,7 +572,7 @@ public class TcpSocketFactoryTest
 
         // 等待接收数据处理完成
         await tcs.Task;
-        await Task.Delay(3000);
+
         client.RemoveDataPackageAdapter<MockEntity>(ReceivedEntityCallBack);
         Assert.Null(adapter.ReceivedCallback);
         Assert.Null(client.ReceivedCallback);
@@ -847,7 +838,7 @@ public class TcpSocketFactoryTest
         public byte Value15 { get; set; }
     }
 
-    class MockSocketDataConverter(DataConverterCollection collection) : DataConverter<MockEntity>(collection)
+    class MockSocketDataConverter : DataConverter<MockEntity>
     {
         protected override bool Parse(ReadOnlyMemory<byte> data, MockEntity entity)
         {
