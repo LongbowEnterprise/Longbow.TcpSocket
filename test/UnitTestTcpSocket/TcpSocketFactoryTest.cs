@@ -54,9 +54,13 @@ public class TcpSocketFactoryTest
         Assert.False(client.IsConnected);
 
         // 连接 TCP Server
+        client.Options.ConnectTimeout = 1000;
         await client.ConnectAsync("localhost", port);
         Assert.True(client.IsConnected);
         Assert.NotEqual(client.Options.LocalEndPoint, client.LocalEndPoint);
+
+        // 测试 ConnectAsync 重复连接
+        await client.ConnectAsync("localhost", port);
 
         // 测试 SendAsync 方法发送取消逻辑
         var cst = new CancellationTokenSource();
