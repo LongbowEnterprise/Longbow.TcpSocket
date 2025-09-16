@@ -3,7 +3,6 @@
 // Website: https://github.com/LongbowExtensions/
 
 using System.Net.Sockets;
-using System.Runtime.InteropServices;
 
 namespace Longbow.TcpSocket;
 

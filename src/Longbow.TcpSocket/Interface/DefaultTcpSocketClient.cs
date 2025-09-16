@@ -147,6 +147,10 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         {
             // canceled
         }
+        catch (Exception)
+        {
+
+        }
         finally
         {
             if (ReceivedCallback != null)
