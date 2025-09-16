@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
-using System.Text;
 using UnitTestSocket;
 
 namespace UnitTestTcpSocket;
@@ -22,6 +21,7 @@ public class TcpSocketFactoryTest
         var provider = sc.BuildServiceProvider();
         var factory = provider.GetRequiredService<ITcpSocketFactory>();
         var client1 = factory.GetOrCreate("demo");
+        Assert.Equal(client1.Options.LocalEndPoint, client1.LocalEndPoint);
         await client1.CloseAsync();
 
         var client2 = factory.GetOrCreate("demo", op => op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0));
@@ -44,119 +44,6 @@ public class TcpSocketFactoryTest
         await factory.DisposeAsync();
     }
 
-    //[Fact]
-    //public async Task ConnectAsync_Timeout()
-    //{
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider, MockConnectTimeoutSocketProvider>();
-    //    }, options => options.ConnectTimeout = 10);
-
-    //    var connect = await client.ConnectAsync("localhost", 9999);
-    //    Assert.False(connect);
-    //}
-
-    //[Fact]
-    //public async Task ConnectAsync_Cancel()
-    //{
-    //    var client = CreateClient(builder =>
-    //    {
-    //        builder.AddTransient<ITcpSocketClientProvider, MockConnectCancelSocketProvider>();
-    //    },
-    //    options =>
-    //    {
-    //        options.ConnectTimeout = 500;
-    //    });
-
-    //    // 测试 ConnectAsync 方法连接取消逻辑
-    //    var cst = new CancellationTokenSource();
-    //    cst.Cancel();
-    //    var connect = await client.ConnectAsync("localhost", 9999, cst.Token);
-
-    //    // 由于信号量被取消，所以连接会失败
-    //    Assert.False(connect);
-
-    //    // 测试真正的连接被取消逻辑
-    //    cst = new CancellationTokenSource(200);
-    //    connect = await client.ConnectAsync("localhost", 9999, cst.Token);
-    //    Assert.False(connect);
-    //}
-
-    //[Fact]
-    //public async Task ConnectAsync_Failed()
-    //{
-    //    var client = CreateClient();
-
-    //    // 测试 ConnectAsync 方法连接失败
-    //    var connect = await client.ConnectAsync("localhost", 9999);
-    //    Assert.False(connect);
-    //}
-
-    //[Fact]
-    //public async Task ConnectAsync_Lock()
-    //{
-    //    // 测试并发锁问题
-    //    var provider = new MockAutoReconnectLockSocketProvider();
-    //    var client = CreateClient(builder =>
-    //    {
-    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-    //    });
-
-    //    // 开 5 个线程同时连接
-    //    _ = Task.Run(async () =>
-    //    {
-    //        // 延时 150 保证有一个连接失败
-    //        await Task.Delay(150);
-    //        provider.SetConnected(true);
-    //    });
-    //    var results = await Task.WhenAll(Enumerable.Range(1, 5).Select(i => client.ConnectAsync("localhost", 0).AsTask()));
-    //    // 期望结果是 1个 false 4个 true
-    //    Assert.Equal(1, results.Count(r => !r));
-    //    Assert.Equal(4, results.Count(r => r));
-    //}
-
-    //[Fact]
-    //public async Task Send_Timeout()
-    //{
-    //    var port = 8887;
-    //    var server = StartTcpServer(port, MockSplitPackageAsync);
-
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider, MockSendTimeoutSocketProvider>();
-    //    }, op => op.SendTimeout = 10);
-
-    //    await client.ConnectAsync("localhost", port);
-
-    //    var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-    //    var result = await client.SendAsync(data);
-    //    Assert.False(result);
-    //}
-
-    //[Fact]
-    //public async Task SendAsync_Error()
-    //{
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider, MockSendErrorSocketProvider>();
-    //    });
-
-    //    // 测试未建立连接前调用 SendAsync 方法报异常逻辑
-    //    var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-    //    var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.SendAsync(data));
-    //    Assert.NotNull(ex);
-
-    //    // 测试发送失败
-    //    var port = 8892;
-    //    var server = StartTcpServer(port, MockSplitPackageAsync);
-
-    //    await client.ConnectAsync("localhost", port);
-    //    Assert.True(client.IsConnected);
-    //}
-
     [Fact]
     public async Task SendAsync_Cancel()
     {
@@ -169,16 +56,14 @@ public class TcpSocketFactoryTest
         // 连接 TCP Server
         await client.ConnectAsync("localhost", port);
         Assert.True(client.IsConnected);
+        Assert.NotEqual(client.Options.LocalEndPoint, client.LocalEndPoint);
 
         // 测试 SendAsync 方法发送取消逻辑
         var cst = new CancellationTokenSource();
         cst.Cancel();
 
-        var result = await client.SendAsync("test", null, cst.Token);
-        Assert.False(result);
-
-        result = await client.SendAsync("test", Encoding.UTF8, cst.Token);
-        Assert.False(result);
+        var ex = Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await client.SendAsync("test", null, cst.Token));
+        Assert.NotNull(ex);
 
         // 关闭连接
         StopTcpServer(server);
@@ -190,7 +75,7 @@ public class TcpSocketFactoryTest
         var port = 8888;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient(optionConfigure: op => op.ReceiveTimeout = 100);
+        var client = CreateClient(configureOptions: op => op.ReceiveTimeout = 100);
 
         await client.ConnectAsync("localhost", port);
 
@@ -224,12 +109,13 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task ReceiveAsync_InvalidOperationException()
+    public async Task ReceiveAsync_NotConnected()
     {
         // 未连接时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var client = CreateClient(optionConfigure: op => op.IsAutoReceive = true);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync(new byte[1024]));
-        Assert.NotNull(ex);
+        var client = CreateClient(configureOptions: op => op.IsAutoReceive = true);
+        // 内部未连接 返回 0 字节
+        var len = await client.ReceiveAsync(new byte[1024]);
+        Assert.Equal(0, len);
 
         // 已连接但是启用了自动接收功能时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
         var port = 8893;
@@ -237,9 +123,6 @@ public class TcpSocketFactoryTest
 
         var connected = await client.ConnectAsync("localhost", port);
         Assert.True(connected);
-
-        ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await client.ReceiveAsync(new byte[1024]));
-        Assert.NotNull(ex);
     }
 
     [Fact]
@@ -250,7 +133,7 @@ public class TcpSocketFactoryTest
         var port = 8891;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        var client = CreateClient(optionConfigure: op => op.IsAutoReceive = false);
+        var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
         client.OnConnecting = () =>
         {
             onConnecting = true;
@@ -280,183 +163,6 @@ public class TcpSocketFactoryTest
         len = await client.ReceiveAsync(buffer);
         Assert.Equal([3, 4], buffer[0..len]);
     }
-
-    //[Fact]
-    //public async Task ReceiveAsync_Error()
-    //{
-    //    var client = CreateClient();
-
-    //    // 测试未建立连接前调用 ReceiveAsync 方法报异常逻辑
-    //    var type = client.GetType();
-    //    Assert.NotNull(type);
-
-    //    var methodInfo = type.GetMethod("AutoReceiveAsync", BindingFlags.NonPublic | BindingFlags.Instance);
-    //    Assert.NotNull(methodInfo);
-
-    //    var task = (ValueTask)methodInfo.Invoke(client, null)!;
-    //    var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () => await task);
-    //    Assert.NotNull(ex);
-
-    //    var port = 8882;
-    //    var server = StartTcpServer(port, MockSplitPackageAsync);
-
-    //    ReadOnlyMemory<byte> buffer = ReadOnlyMemory<byte>.Empty;
-    //    var tcs = new TaskCompletionSource();
-
-    //    // 增加接收回调方法
-    //    client.ReceivedCallback = b =>
-    //    {
-    //        buffer = b;
-    //        tcs.SetResult();
-    //        return ValueTask.CompletedTask;
-    //    };
-
-    //    await client.ConnectAsync("localhost", port);
-
-    //    // 发送数据导致接收数据异常
-    //    var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-    //    await client.SendAsync(data);
-
-    //    await tcs.Task;
-    //    Assert.Equal([1, 2, 3, 4, 5], buffer.ToArray());
-
-    //    // 关闭连接
-    //    StopTcpServer(server);
-    //}
-
-    //[Fact]
-    //public async Task AutoReconnect_Ok()
-    //{
-    //    var client = CreateClient(optionConfigure: options =>
-    //    {
-    //        options.IsAutoReconnect = true;
-    //        options.ReconnectInterval = 200;
-    //        options.IsAutoReceive = true;
-    //    });
-
-    //    // 使用场景自动接收数据，短线后自动重连
-    //    var port = 8894;
-    //    var connect = await client.ConnectAsync("localhost", port);
-    //    Assert.False(connect);
-
-    //    // 开启服务端后，可以自动重连上
-    //    var server = StartTcpServer(port, LoopSendPackageAsync);
-    //    await Task.Delay(250);
-    //    Assert.True(client.IsConnected);
-
-    //    await client.CloseAsync();
-    //    await Task.Delay(250);
-
-    //    await client.DisposeAsync();
-    //}
-
-    //[Fact]
-    //public async Task AutoReconnect_False()
-    //{
-    //    var provider = new MockAutoReconnectSocketProvider();
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-    //    },
-    //    optionConfigure: options =>
-    //    {
-    //        options.IsAutoReconnect = true;
-    //        options.ReconnectInterval = 200;
-    //        options.IsAutoReceive = true;
-    //    });
-
-    //    // 使用场景自动接收数据，短线后自动重连
-    //    var connect = await client.ConnectAsync("localhost", 0);
-    //    Assert.False(connect);
-
-    //    provider.SetConnected(true);
-    //    await Task.Delay(250);
-    //    Assert.True(client.IsConnected);
-    //}
-
-    //[Fact]
-    //public async Task AutoReconnect_Send_Ok()
-    //{
-    //    // 发送数据时连接断开了，测试重连功能
-    //    var provider = new MockAutoReconnectSocketProvider();
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-    //    }, optionConfigure: options =>
-    //    {
-    //        options.IsAutoReconnect = true;
-    //        options.ReconnectInterval = 200;
-    //        options.IsAutoReceive = true;
-    //    });
-
-    //    provider.SetConnected(true);
-    //    var connect = await client.ConnectAsync("localhost", 0);
-    //    Assert.True(connect);
-
-    //    // 发送时断开连接
-    //    provider.SetSend(false);
-    //    var send = await client.SendAsync("test");
-    //    Assert.False(send);
-
-    //    await Task.Delay(250);
-    //    Assert.True(client.IsConnected);
-    //}
-
-    //[Fact]
-    //public async Task AutoReconnect_Receive_Ok()
-    //{
-    //    // 接收数据时连接断开了，测试重连功能
-    //    var provider = new MockAutoReconnectSocketProvider();
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-    //    }, optionConfigure: options =>
-    //    {
-    //        options.IsAutoReconnect = true;
-    //        options.ReconnectInterval = 200;
-    //        options.IsAutoReceive = false;
-    //    });
-
-    //    provider.SetConnected(true);
-    //    var connect = await client.ConnectAsync("localhost", 0);
-    //    Assert.True(connect);
-
-    //    // 发送时断开连接
-    //    provider.SetReceive(false);
-
-    //    var buffer = new byte[1024];
-    //    var len = await client.ReceiveAsync(buffer);
-    //    Assert.Equal(Memory<byte>.Empty, buffer[0..len]);
-
-    //    await Task.Delay(250);
-    //    provider.SetReceive(true);
-    //    len = await client.ReceiveAsync(buffer);
-    //    Assert.Equal(5, len);
-    //}
-
-    //[Fact]
-    //public async Task AutoReconnect_Cancel()
-    //{
-    //    // 测试重连时取消逻辑
-    //    var provider = new MockAutoReconnectSocketProvider();
-    //    var client = CreateClient(builder =>
-    //    {
-    //        // 增加发送报错 MockSocket
-    //        builder.AddTransient<ITcpSocketClientProvider>(p => provider);
-    //    }, optionConfigure: options =>
-    //    {
-    //        options.IsAutoReconnect = true;
-    //        options.ReconnectInterval = 2000;
-    //        options.IsAutoReceive = false;
-    //    });
-
-    //    await client.ConnectAsync("localhost", 0);
-    //    await Task.Delay(100);
-    //    await client.DisposeAsync();
-    //}
 
     [Fact]
     public async Task FixLengthDataPackageHandler_Ok()
@@ -614,13 +320,13 @@ public class TcpSocketFactoryTest
 
         // 设置数据适配器
         var adapter = new DataPackageAdapter(new FixLengthDataPackageHandler(29));
-        var callback = new Func<MockEntity?, Task>(t =>
+        var callback = new Func<MockEntity?, ValueTask>(t =>
         {
             entity = t;
             tcs.SetResult();
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         });
-        client.AddDataPackageAdapter(adapter, new DataConverter<MockEntity>(), callback);
+        client.AddDataPackageAdapter(adapter, callback);
 
         // 连接 TCP Server
         var connect = await client.ConnectAsync("localhost", port);
@@ -633,12 +339,6 @@ public class TcpSocketFactoryTest
         Assert.NotNull(entity);
         Assert.Equal([1, 2, 3, 4, 5], entity.Header);
         Assert.Equal([3, 4], entity.Body);
-
-        // null
-        Assert.Equal((byte)0x0, entity.Value16);
-
-        // null
-        Assert.Equal((byte)0x1, entity.Value17);
 
         // byte
         Assert.Equal(0x1, entity.Value15);
@@ -694,19 +394,12 @@ public class TcpSocketFactoryTest
         {
             entity = t;
             tcs.SetResult();
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         });
         await client.SendAsync(data);
         await tcs.Task;
 
         Assert.NotNull(entity);
-        Assert.Equal([1, 2, 3, 4, 5], entity.Header);
-
-        // 测试数据适配器直接调用 TryConvertTo 方法转换数据
-        var adapter2 = new DataPackageAdapter();
-        var result = adapter2.TryConvertTo(data, new DataConverter<MockEntity>(), out var t);
-        Assert.True(result);
-        Assert.NotNull(t);
         Assert.Equal([1, 2, 3, 4, 5], entity.Header);
 
         // 测试 SetDataPackageAdapter 泛型无标签情况，内部使用 DataConverter 转换器
@@ -716,14 +409,14 @@ public class TcpSocketFactoryTest
         {
             noConvertEntity = t;
             tcs.SetResult();
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         });
         await client.SendAsync(data);
         await tcs.Task;
         Assert.NotNull(noConvertEntity);
 
-        var converter = new MockSocketDataConverter();
-        result = converter.TryConvertTo(new byte[] { 0x1, 0x2 }, out t);
+        var converter = new MockSocketDataConverter(new DataConverterCollection());
+        var result = converter.TryConvertTo(new byte[] { 0x1, 0x2 }, out var t);
         Assert.False(result);
 
         server.Stop();
@@ -743,12 +436,12 @@ public class TcpSocketFactoryTest
                 options.AddPropertyConverter<OptionConvertEntity>(entity => entity.Header, new DataPropertyConverterAttribute()
                 {
                     Offset = 0,
-                    Length = 5
+                    Length = 2
                 });
                 options.AddPropertyConverter<OptionConvertEntity>(entity => entity.Body, new DataPropertyConverterAttribute()
                 {
-                    Offset = 5,
-                    Length = 2
+                    Offset = 2,
+                    Length = 3
                 });
             });
         });
@@ -767,7 +460,7 @@ public class TcpSocketFactoryTest
             // buffer 即是接收到的数据
             entity = data;
             tcs.SetResult();
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         });
 
         // 发送数据
@@ -777,8 +470,8 @@ public class TcpSocketFactoryTest
         // 等待接收数据处理完成
         await tcs.Task;
         Assert.NotNull(entity);
-        Assert.Equal([1, 2, 3, 4, 5], entity.Header);
-        Assert.Equal([3, 4], entity.Body);
+        Assert.Equal([1, 2], entity.Header);
+        Assert.Equal([3, 4, 5], entity.Body);
 
         server.Stop();
     }
@@ -870,33 +563,28 @@ public class TcpSocketFactoryTest
 
         // 连接 TCP Server
         var connect = await client.ConnectAsync("localhost", port);
+        ValueTask ReceivedEntityCallBack(MockEntity? entity)
+        {
+            tcs.TrySetResult();
+            return ValueTask.CompletedTask;
+        }
 
-        client.AddDataPackageAdapter(new DataPackageAdapter(new FixLengthDataPackageHandler(7)), ReceivedCallBack);
         client.AddDataPackageAdapter<MockEntity>(new FixLengthDataPackageHandler(7), ReceivedEntityCallBack);
 
-        client.AddDataPackageAdapter(new DataPackageAdapter(new FixLengthDataPackageHandler(7)), ReceivedCallBack);
-        client.AddDataPackageAdapter(new FixLengthDataPackageHandler(7), new MockSocketDataConverter(), ReceivedEntityCallBack);
+        // 相同 adapter 添加多次
+        var adapter = new DataPackageAdapter(new FixLengthDataPackageHandler(7));
+        client.AddDataPackageAdapter<MockEntity>(adapter, ReceivedEntityCallBack);
+        client.AddDataPackageAdapter<MockEntity>(adapter, ReceivedEntityCallBack);
 
         var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
         await client.SendAsync(data);
 
         // 等待接收数据处理完成
         await tcs.Task;
-
-        ValueTask ReceivedCallBack(ReadOnlyMemory<byte> buffer)
-        {
-            // buffer 即是接收到的数据
-            buffer.CopyTo(receivedBuffer);
-            receivedBuffer = receivedBuffer[..buffer.Length];
-            tcs.SetResult();
-            return ValueTask.CompletedTask;
-        }
-
-        Task ReceivedEntityCallBack(MockEntity? entity)
-        {
-            tcs.SetResult();
-            return Task.CompletedTask;
-        }
+        await Task.Delay(3000);
+        client.RemoveDataPackageAdapter<MockEntity>(ReceivedEntityCallBack);
+        Assert.Null(adapter.ReceivedCallback);
+        Assert.Null(client.ReceivedCallback);
     }
 
     [Fact]
@@ -925,11 +613,11 @@ public class TcpSocketFactoryTest
         Assert.NotNull(entity);
         Assert.Equal("3.14", entity.Value1.ToString("#.##"));
 
-        Task ReceivedCallBack(MockConverterEntity? data)
+        ValueTask ReceivedCallBack(MockConverterEntity? data)
         {
             entity = data;
             tcs.SetResult();
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -1030,7 +718,14 @@ public class TcpSocketFactoryTest
             }
 
             // 回写数据到客户端
-            await stream.WriteAsync(new byte[] { 0x1, 0x2, 0x3, 0x4, 0x5, 0x3, 0x4, 0x31, 0x09, 0x10, 0x40, 0x09, 0x1E, 0xB8, 0x51, 0xEB, 0x85, 0x1F, 0x40, 0x49, 0x0F, 0xDB, 0x23, 0x24, 0x25, 0x26, 0x01, 0x01, 0x29 }, CancellationToken.None);
+            await stream.WriteAsync(new byte[] {
+                0x01, 0x02, 0x03, 0x04, 0x05,
+                0x03, 0x04, 0x31, 0x09, 0x10,
+                0x40, 0x09, 0x1E, 0xB8, 0x51,
+                0xEB, 0x85, 0x1F, 0x40, 0x49,
+                0x0F, 0xDB, 0x23, 0x24, 0x25,
+                0x26, 0x01, 0x01, 0x29
+            }, CancellationToken.None);
         }
     }
 
@@ -1082,7 +777,7 @@ public class TcpSocketFactoryTest
         server?.Stop();
     }
 
-    private static ITcpSocketClient CreateClient(Action<ServiceCollection>? builder = null, Action<TcpSocketClientOptions>? optionConfigure = null)
+    private static ITcpSocketClient CreateClient(Action<ServiceCollection>? builder = null, Action<TcpSocketClientOptions>? configureOptions = null)
     {
         var sc = new ServiceCollection();
         sc.AddTcpSocketFactory();
@@ -1093,255 +788,11 @@ public class TcpSocketFactoryTest
         var client = factory.GetOrCreate("test", op =>
         {
             op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0);
-            optionConfigure?.Invoke(op);
+            configureOptions?.Invoke(op);
         });
+
         return client;
     }
-
-    //class MockSendErrorSocketProvider : ITcpSocketClientProvider
-    //{
-    //    public bool IsConnected { get; private set; }
-
-    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
-
-    //    public TcpSocketClientOptions Options { get; } = new();
-
-    //    public ValueTask CloseAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-
-    //    public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-    //    {
-    //        IsConnected = true;
-    //        return ValueTask.FromResult(true);
-    //    }
-
-    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(0);
-    //    }
-
-    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-    //    {
-    //        throw new Exception("Mock send error");
-    //    }
-
-    //    public ValueTask DisposeAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-    //}
-
-    //class MockConnectTimeoutSocketProvider : ITcpSocketClientProvider
-    //{
-    //    public bool IsConnected { get; private set; }
-
-    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
-
-    //    public TcpSocketClientOptions Options { get; } = new();
-
-    //    public ValueTask CloseAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-
-    //    public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-    //    {
-    //        await Task.Delay(1000, token);
-    //        IsConnected = false;
-    //        return false;
-    //    }
-
-    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(0);
-    //    }
-
-    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(true);
-    //    }
-
-    //    public ValueTask DisposeAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-    //}
-
-    //class MockConnectCancelSocketProvider : ITcpSocketClientProvider
-    //{
-    //    public bool IsConnected { get; private set; }
-
-    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
-
-    //    public TcpSocketClientOptions Options { get; } = new();
-
-    //    public ValueTask CloseAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-
-    //    public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-    //    {
-    //        await Task.Delay(250, token);
-    //        return false;
-    //    }
-
-    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(0);
-    //    }
-
-    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(true);
-    //    }
-
-    //    public ValueTask DisposeAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-    //}
-
-    //class MockSendTimeoutSocketProvider : ITcpSocketClientProvider
-    //{
-    //    public bool IsConnected { get; private set; }
-
-    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Any, 0);
-
-    //    public TcpSocketClientOptions Options { get; } = new();
-
-    //    public ValueTask CloseAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-
-    //    public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-    //    {
-    //        IsConnected = true;
-    //        return ValueTask.FromResult(true);
-    //    }
-
-    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(0);
-    //    }
-
-    //    public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-    //    {
-    //        // 模拟超时发送
-    //        await Task.Delay(100, token);
-    //        return false;
-    //    }
-
-    //    public ValueTask DisposeAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-    //}
-
-    //class MockAutoReconnectLockSocketProvider : ITcpSocketClientProvider
-    //{
-    //    public bool IsConnected { get; private set; }
-
-    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
-
-    //    public TcpSocketClientOptions Options { get; } = new();
-
-    //    public async ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-    //    {
-    //        await Task.Delay(100, token);
-    //        return IsConnected;
-    //    }
-
-    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(true);
-    //    }
-
-    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-    //    {
-    //        byte[] data = [1, 2, 3, 4, 5];
-    //        data.CopyTo(buffer);
-    //        return ValueTask.FromResult(5);
-    //    }
-
-    //    public ValueTask CloseAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-
-    //    public void SetConnected(bool state)
-    //    {
-    //        IsConnected = state;
-    //    }
-
-    //    public ValueTask DisposeAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-    //}
-
-    //class MockAutoReconnectSocketProvider : ITcpSocketClientProvider
-    //{
-    //    public bool IsConnected { get; private set; }
-
-    //    public IPEndPoint LocalEndPoint { get; set; } = new IPEndPoint(IPAddress.Loopback, 0);
-
-    //    public TcpSocketClientOptions Options { get; } = new();
-
-    //    public ValueTask<bool> ConnectAsync(IPEndPoint endPoint, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(IsConnected);
-    //    }
-
-    //    private bool _sendState = true;
-    //    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
-    //    {
-    //        return ValueTask.FromResult(_sendState);
-    //    }
-
-    //    private bool _receiveState = true;
-    //    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
-    //    {
-    //        if (_receiveState)
-    //        {
-    //            byte[] data = [1, 2, 3, 4, 5];
-    //            data.CopyTo(buffer);
-    //            return ValueTask.FromResult(5);
-    //        }
-    //        else
-    //        {
-    //            return ValueTask.FromResult(0);
-    //        }
-    //    }
-
-    //    public ValueTask CloseAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-
-    //    public void SetConnected(bool state)
-    //    {
-    //        IsConnected = state;
-    //    }
-
-    //    public void SetSend(bool state)
-    //    {
-    //        _sendState = state;
-    //    }
-
-    //    public void SetReceive(bool state)
-    //    {
-    //        _receiveState = state;
-    //    }
-
-    //    public ValueTask DisposeAsync()
-    //    {
-    //        return ValueTask.CompletedTask;
-    //    }
-    //}
 
     class MockEntity
     {
@@ -1394,15 +845,9 @@ public class TcpSocketFactoryTest
 
         [DataPropertyConverter(Offset = 0, Length = 1)]
         public byte Value15 { get; set; }
-
-        [DataPropertyConverter(Offset = 0, Length = 1, ConverterType = typeof(MockNullConverter))]
-        public byte Value16 { get; set; }
-
-        [DataPropertyConverter(Offset = 0, Length = 1)]
-        public byte Value17 { get; set; }
     }
 
-    class MockSocketDataConverter : DataConverter<MockEntity>
+    class MockSocketDataConverter(DataConverterCollection collection) : DataConverter<MockEntity>(collection)
     {
         protected override bool Parse(ReadOnlyMemory<byte> data, MockEntity entity)
         {
