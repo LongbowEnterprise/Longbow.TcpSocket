@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 // Website: https://github.com/LongbowExtensions/
 
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Text;
 
@@ -45,6 +46,24 @@ public static class ITcpSocketClientExtensions
     {
         var endPoint = TcpSocketUtility.ConvertToIpEndPoint(ipString, port);
         return client.ConnectAsync(endPoint, token);
+    }
+
+    /// <summary>
+    /// 异步接收方法
+    /// </summary>
+    /// <param name="client"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    public static async ValueTask<ReadOnlyMemory<byte>> ReceiveAsync(this ITcpSocketClient client, CancellationToken token = default)
+    {
+        using var memory = MemoryPool<byte>.Shared.Rent(client.Options.ReceiveBufferSize);
+        var len = await client.ReceiveAsync(memory.Memory, token);
+        if (len == 0)
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        return memory.Memory[0..len].ToArray();
     }
 
     private static readonly ConcurrentDictionary<Func<ReadOnlyMemory<byte>, ValueTask>, Dictionary<IDataPackageAdapter, List<Func<ReadOnlyMemory<byte>, ValueTask>>>> DataPackageAdapterCache = [];
