@@ -16,6 +16,8 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     private CancellationTokenSource? _autoReceiveTokenSource;
     private readonly SemaphoreSlim _semaphoreSlimForConnect = new(1, 1);
     private readonly TcpSocketClientOptions _options = options.Value.CopyTo();
+    private Sender? _sender;
+    private Receiver? _receiver;
 
     /// <summary>
     /// <inheritdoc/>
@@ -139,8 +141,8 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
                     receiveToken = link.Token;
                 }
 
-                using var receiver = new Receiver(_client!.Client);
-                len = await receiver.ReceiveAsync(buffer, receiveToken);
+                _receiver ??= new Receiver(_client.Client);
+                len = await _receiver.ReceiveAsync(buffer, receiveToken);
             }
         }
         catch (OperationCanceledException)
@@ -159,6 +161,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
                 await ReceivedCallback(buffer[0..len]);
             }
         }
+
         return len;
     }
 
@@ -167,8 +170,18 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// </summary>
     public async ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
     {
-        using var sender = new Sender(_client!.Client);
-        return await sender.SendAsync(data, token);
+        if (_client != null)
+        {
+            _sender ??= new Sender(_client.Client);
+        }
+
+        var ret = false;
+        if (_sender != null)
+        {
+            ret = await _sender.SendAsync(data, token);
+        }
+
+        return ret;
     }
 
     /// <summary>
@@ -187,6 +200,12 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
             _autoReceiveTokenSource.Dispose();
             _autoReceiveTokenSource = null;
         }
+
+        _sender?.Dispose();
+        _sender = null;
+
+        _receiver?.Dispose();
+        _receiver = null;
 
         if (_client != null)
         {
