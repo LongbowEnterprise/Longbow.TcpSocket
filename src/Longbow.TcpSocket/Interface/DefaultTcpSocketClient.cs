@@ -202,7 +202,10 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         }
 
         _sender?.Dispose();
+        _sender = null;
+
         _receiver?.Dispose();
+        _receiver = null;
 
         if (_client != null)
         {
