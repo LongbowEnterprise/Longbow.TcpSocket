@@ -192,25 +192,6 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public async ValueTask<ReadOnlyMemory<byte>> ReceiveAsync(CancellationToken token = default)
-    {
-        var buffer = ArrayPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
-        var len = await ReceiveCoreAsync(buffer, token);
-        if (len == 0)
-        {
-            return ReadOnlyMemory<byte>.Empty;
-        }
-
-        var ret = new byte[len];
-        buffer.CopyTo(ret);
-        ArrayPool<byte>.Shared.Return(buffer);
-
-        return ret;
-    }
-
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
     public ValueTask CloseAsync()
     {
         if (_autoReceiveTokenSource != null)
