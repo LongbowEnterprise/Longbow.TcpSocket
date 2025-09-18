@@ -27,7 +27,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public IPEndPoint LocalEndPoint => _localEndPoint ?? _options.LocalEndPoint;
+    public IPEndPoint LocalEndPoint => _localEndPoint ?? Options.LocalEndPoint;
 
     /// <summary>
     /// <inheritdoc/>
@@ -97,7 +97,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
                 ret = true;
             }
 
-            if (_options.IsAutoReceive)
+            if (Options.IsAutoReceive)
             {
                 _ = Task.Run(AutoReceiveAsync, CancellationToken.None).ConfigureAwait(false);
             }
@@ -117,7 +117,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         // 自动接收方法
         _autoReceiveTokenSource ??= new();
 
-        using var block = MemoryPool<byte>.Shared.Rent(_options.ReceiveBufferSize);
+        using var block = MemoryPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
         var buffer = block.Memory;
         while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
@@ -133,10 +133,10 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
             if (_client is { Connected: true })
             {
                 var receiveToken = token;
-                if (_options.ReceiveTimeout > 0)
+                if (Options.ReceiveTimeout > 0)
                 {
                     // 设置接收超时时间
-                    using var receiveTokenSource = new CancellationTokenSource(_options.ReceiveTimeout);
+                    using var receiveTokenSource = new CancellationTokenSource(Options.ReceiveTimeout);
                     using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
                     receiveToken = link.Token;
                 }
@@ -181,7 +181,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
             var sendToken = token;
             if (Options.SendTimeout > 0)
             {
-                using var sendTokenSource = new CancellationTokenSource(_options.SendTimeout);
+                using var sendTokenSource = new CancellationTokenSource(Options.SendTimeout);
                 using var link = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token);
                 sendToken = link.Token;
             }
