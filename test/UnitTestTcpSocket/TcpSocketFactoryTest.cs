@@ -77,6 +77,7 @@ public class TcpSocketFactoryTest
         // 测试正常电文
         cst.Dispose();
         cst = new();
+        client.Options.SendTimeout = 1000;
         var result = await client.SendAsync("test", Encoding.UTF8, cst.Token);
         Assert.True(result);
 
