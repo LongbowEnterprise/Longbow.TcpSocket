@@ -132,9 +132,8 @@ public class TcpSocketFactoryTest
         var server = StartTcpServer(port, MockZeroPackageAsync);
         await client.ConnectAsync("localhost", port);
 
-        var buffer = new byte[10];
-        var len = await client.ReceiveAsync(buffer);
-        Assert.Equal(0, len);
+        var buffer = await client.ReceiveAsync();
+        Assert.Equal(ReadOnlyMemory<byte>.Empty, buffer);
         server.Stop();
     }
 
@@ -190,8 +189,9 @@ public class TcpSocketFactoryTest
         Assert.Equal([1, 2, 3, 4, 5], buffer[0..len]);
 
         // 由于服务器端模拟了拆包发送第二段数据，所以这里可以再次调用 ReceiveAsync 方法获取第二段数据
-        len = await client.ReceiveAsync(buffer);
-        Assert.Equal([3, 4], buffer[0..len]);
+        // 调用扩展方法直接获得到接收数据
+        var payload = await client.ReceiveAsync();
+        Assert.Equal([3, 4], payload.ToArray());
     }
 
     [Fact]
