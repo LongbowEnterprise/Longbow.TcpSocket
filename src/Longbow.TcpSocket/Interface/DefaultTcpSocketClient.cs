@@ -178,7 +178,14 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         var ret = false;
         if (_sender != null)
         {
-            ret = await _sender.SendAsync(data, token);
+            var sendToken = token;
+            if (Options.SendTimeout > 0)
+            {
+                using var sendTokenSource = new CancellationTokenSource(_options.SendTimeout);
+                using var link = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token);
+                sendToken = link.Token;
+            }
+            ret = await _sender.SendAsync(data, sendToken);
         }
 
         return ret;
