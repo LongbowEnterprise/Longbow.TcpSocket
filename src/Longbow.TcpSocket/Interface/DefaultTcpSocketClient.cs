@@ -136,14 +136,6 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
                 len = await _receiver.ReceiveAsync(buffer);
             }
         }
-        catch (OperationCanceledException)
-        {
-            // canceled
-        }
-        catch (Exception)
-        {
-
-        }
         finally
         {
             if (ReceivedCallback != null)
