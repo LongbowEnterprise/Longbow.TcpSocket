@@ -18,13 +18,11 @@ sealed class Receiver : IDisposable
         _args.Completed += OnReceiveCompleted;
     }
 
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
         var tcs = new TaskCompletionSource<int>();
-        var registration = token.Register(() => tcs.TrySetCanceled());
-
         _args.SetBuffer(buffer);
-        _args.UserToken = (tcs, registration);
+        _args.UserToken = tcs;
 
         try
         {
@@ -44,27 +42,20 @@ sealed class Receiver : IDisposable
 
     private void OnReceiveCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        var (tcs, registration) = ((TaskCompletionSource<int>, CancellationTokenRegistration))e.UserToken!;
+        var tcs = (TaskCompletionSource<int>)e.UserToken!;
 
-        try
+        if (e.SocketError != SocketError.Success)
         {
-            if (e.SocketError != SocketError.Success)
-            {
-                tcs.TrySetException(new SocketException((int)e.SocketError));
-            }
-            else if (e.BytesTransferred == 0)
-            {
-                _socket.Close();
-                tcs.TrySetException(new SocketException((int)SocketError.ConnectionReset));
-            }
-            else
-            {
-                tcs.TrySetResult(e.BytesTransferred);
-            }
+            tcs.TrySetException(new SocketException((int)e.SocketError));
         }
-        finally
+        else if (e.BytesTransferred == 0)
         {
-            registration.Dispose();
+            _socket.Close();
+            tcs.TrySetException(new SocketException((int)SocketError.ConnectionReset));
+        }
+        else
+        {
+            tcs.TrySetResult(e.BytesTransferred);
         }
     }
 

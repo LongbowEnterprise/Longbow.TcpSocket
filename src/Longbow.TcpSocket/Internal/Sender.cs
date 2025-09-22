@@ -19,14 +19,13 @@ sealed class Sender : IDisposable
         _args.Completed += OnSendCompleted;
     }
 
-    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default)
+    public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data)
     {
         var tcs = new TaskCompletionSource<bool>();
-        var registration = token.Register(() => tcs.TrySetCanceled());
 
         if (MemoryMarshal.TryGetArray(data, out var segment))
         {
-            _args.UserToken = (tcs, registration);
+            _args.UserToken = tcs;
             _args.SetBuffer(segment.Array, segment.Offset, segment.Count);
 
             if (!_socket.SendAsync(_args))
@@ -39,8 +38,7 @@ sealed class Sender : IDisposable
 
     private void OnSendCompleted(object? sender, SocketAsyncEventArgs e)
     {
-        var (tcs, registration) = ((TaskCompletionSource<bool>, CancellationTokenRegistration))e.UserToken!;
-        registration.Dispose();
+        var tcs = (TaskCompletionSource<bool>)e.UserToken!;
 
         if (e.SocketError == SocketError.Success)
         {
