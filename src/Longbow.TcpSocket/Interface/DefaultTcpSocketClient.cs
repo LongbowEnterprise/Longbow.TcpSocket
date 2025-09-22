@@ -132,17 +132,8 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         {
             if (_client is { Connected: true })
             {
-                var receiveToken = token;
-                if (Options.ReceiveTimeout > 0)
-                {
-                    // 设置接收超时时间
-                    using var receiveTokenSource = new CancellationTokenSource(Options.ReceiveTimeout);
-                    using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
-                    receiveToken = link.Token;
-                }
-
                 _receiver ??= new Receiver(_client.Client);
-                len = await _receiver.ReceiveAsync(buffer, receiveToken);
+                len = await _receiver.ReceiveAsync(buffer);
             }
         }
         catch (OperationCanceledException)
@@ -178,14 +169,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         var ret = false;
         if (_sender != null)
         {
-            var sendToken = token;
-            if (Options.SendTimeout > 0)
-            {
-                using var sendTokenSource = new CancellationTokenSource(Options.SendTimeout);
-                using var link = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token);
-                sendToken = link.Token;
-            }
-            ret = await _sender.SendAsync(data, sendToken);
+            ret = await _sender.SendAsync(data);
         }
 
         return ret;
