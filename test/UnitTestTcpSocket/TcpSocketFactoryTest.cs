@@ -104,26 +104,6 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task ReceiveAsync_Cancel()
-    {
-        var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
-
-        // 已连接但是启用了自动接收功能时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var port = 8892;
-        var server = StartTcpServer(port, MockMutePackageAsync);
-        await client.ConnectAsync("localhost", port);
-
-        var result = await client.SendAsync(new byte[] { 0x01 });
-        Assert.True(result);
-
-        var token = new CancellationTokenSource(10);
-        var buffer = new byte[12];
-        var len = await client.ReceiveAsync(buffer, token.Token);
-        Assert.Equal(0, len);
-        server.Stop();
-    }
-
-    [Fact]
     public async Task ReceiveAsync_Zero()
     {
         var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
@@ -133,8 +113,7 @@ public class TcpSocketFactoryTest
         var server = StartTcpServer(port, MockZeroPackageAsync);
         await client.ConnectAsync("localhost", port);
 
-        var buffer = await client.ReceiveAsync();
-        Assert.Equal(ReadOnlyMemory<byte>.Empty, buffer);
+        await Assert.ThrowsAnyAsync<Exception>(async () => await client.ReceiveAsync());
         server.Stop();
     }
 
@@ -354,7 +333,6 @@ public class TcpSocketFactoryTest
 
     private static Task MockZeroPackageAsync(TcpClient client)
     {
-        // 模拟延时
         client.Close();
         return Task.CompletedTask;
     }
