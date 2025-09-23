@@ -121,11 +121,11 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         var buffer = block.Memory;
         while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
-            await ReceiveCoreAsync(block.Memory, _autoReceiveTokenSource.Token);
+            await ReceiveCoreAsync(block.Memory);
         }
     }
 
-    private async ValueTask<int> ReceiveCoreAsync(Memory<byte> buffer, CancellationToken token)
+    private async ValueTask<int> ReceiveCoreAsync(Memory<byte> buffer)
     {
         var len = 0;
         try
@@ -170,7 +170,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default) => ReceiveCoreAsync(buffer, token);
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default) => ReceiveCoreAsync(buffer);
 
     /// <summary>
     /// <inheritdoc/>
