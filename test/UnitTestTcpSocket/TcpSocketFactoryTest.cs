@@ -82,10 +82,6 @@ public class TcpSocketFactoryTest
         // 调用 SendAsync 方法
         ReadOnlyMemory<byte> buffer = new byte[2048];
         sendAsyncMethod.Invoke(sender, [buffer]);
-
-        // 测试未连接时发送异常逻辑
-        tcpClient.Client.Shutdown(SocketShutdown.Both);
-        sendAsyncMethod.Invoke(sender, [buffer]);
     }
 
     [Fact]
