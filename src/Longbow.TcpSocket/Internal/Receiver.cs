@@ -16,17 +16,9 @@ sealed class Receiver(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<in
         _tcs.Reset();
         SetBuffer(buffer);
 
-        try
+        if (!socket.ReceiveAsync(this))
         {
-            if (!socket.ReceiveAsync(this))
-            {
-                OnCompleted(this);
-            }
-        }
-        catch (Exception ex)
-        {
-            socket.Close();
-            _tcs.SetException(ex);
+            OnCompleted(this);
         }
 
         return new ValueTask<int>(this, _tcs.Version);
