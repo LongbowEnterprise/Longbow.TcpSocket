@@ -4,59 +4,65 @@
 
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks.Sources;
 
 namespace Longbow.TcpSocket;
 
-sealed class Sender : IDisposable
+sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool>
 {
-    private readonly Socket _socket;
-    private readonly SocketAsyncEventArgs _args;
-
-    public Sender(Socket socket)
-    {
-        _socket = socket;
-        _args = new();
-        _args.Completed += OnSendCompleted;
-    }
+    private ManualResetValueTaskSourceCore<bool> _tcs;
+    private int _length;
+    private int _totalSent;
+    private Memory<byte> _buffer;
 
     public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data)
     {
-        var tcs = new TaskCompletionSource<bool>();
+        _tcs.Reset();
 
-        if (MemoryMarshal.TryGetArray(data, out var segment))
-        {
-            _args.UserToken = tcs;
-            _args.SetBuffer(segment.Array, segment.Offset, segment.Count);
+        _length = data.Length;
+        _totalSent = 0;
+        _buffer = MemoryMarshal.AsMemory(data);
+        SendCoreAsync();
 
-            if (!_socket.SendAsync(_args))
-            {
-                OnSendCompleted(null, _args);
-            }
-        }
-        return new ValueTask<bool>(tcs.Task);
+        return new ValueTask<bool>(this, _tcs.Version);
     }
 
-    private void OnSendCompleted(object? sender, SocketAsyncEventArgs e)
+    private void SendCoreAsync()
     {
-        var tcs = (TaskCompletionSource<bool>)e.UserToken!;
+        int bytesToSend = Math.Min(_length - _totalSent, 1460);
+        SetBuffer(_buffer[_totalSent..bytesToSend]);
 
+        if (!socket.SendAsync(this))
+        {
+            OnCompleted(this);
+        }
+    }
+
+    protected override void OnCompleted(SocketAsyncEventArgs e)
+    {
         if (e.SocketError == SocketError.Success)
         {
-            tcs.TrySetResult(true);
+            _totalSent += e.BytesTransferred;
+            if (_totalSent >= _length)
+            {
+                _tcs.SetResult(true);
+            }
+            else
+            {
+                SendCoreAsync();
+            }
         }
         else
         {
-            _socket.Close();
-            tcs.TrySetException(new SocketException((int)e.SocketError));
+            socket.Close();
+            _tcs.SetException(new SocketException((int)e.SocketError));
         }
     }
 
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
-    public void Dispose()
-    {
-        _args.Completed -= OnSendCompleted;
-        _args.Dispose();
-    }
+    bool IValueTaskSource<bool>.GetResult(short token) => _tcs.GetResult(token);
+
+    ValueTaskSourceStatus IValueTaskSource<bool>.GetStatus(short token) => _tcs.GetStatus(token);
+
+    void IValueTaskSource<bool>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
+        => _tcs.OnCompleted(continuation, state, token, flags);
 }

@@ -3,65 +3,56 @@
 // Website: https://github.com/LongbowExtensions/
 
 using System.Net.Sockets;
+using System.Threading.Tasks.Sources;
 
 namespace Longbow.TcpSocket;
 
-sealed class Receiver : IDisposable
+sealed class Receiver(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<int>
 {
-    private readonly Socket _socket;
-    private readonly SocketAsyncEventArgs _args;
-
-    public Receiver(Socket socket)
-    {
-        _socket = socket;
-        _args = new();
-        _args.Completed += OnReceiveCompleted;
-    }
+    private ManualResetValueTaskSourceCore<int> _tcs;
 
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer)
     {
-        var tcs = new TaskCompletionSource<int>();
-        _args.SetBuffer(buffer);
-        _args.UserToken = tcs;
+        _tcs.Reset();
+        SetBuffer(buffer);
 
         try
         {
-            if (!_socket.ReceiveAsync(_args))
+            if (!socket.ReceiveAsync(this))
             {
-                OnReceiveCompleted(null, _args);
+                OnCompleted(this);
             }
         }
         catch (Exception ex)
         {
-            _socket.Close();
-            tcs.TrySetException(ex);
+            socket.Close();
+            _tcs.SetException(ex);
         }
 
-        return new ValueTask<int>(tcs.Task);
+        return new ValueTask<int>(this, _tcs.Version);
     }
 
-    private void OnReceiveCompleted(object? sender, SocketAsyncEventArgs e)
+    protected override void OnCompleted(SocketAsyncEventArgs e)
     {
-        var tcs = (TaskCompletionSource<int>)e.UserToken!;
-
         if (e.SocketError != SocketError.Success)
         {
-            tcs.TrySetException(new SocketException((int)e.SocketError));
+            _tcs.SetException(new SocketException((int)e.SocketError));
         }
         else if (e.BytesTransferred == 0)
         {
-            _socket.Close();
-            tcs.TrySetException(new SocketException((int)SocketError.ConnectionReset));
+            socket.Close();
+            _tcs.SetException(new SocketException((int)SocketError.ConnectionReset));
         }
         else
         {
-            tcs.TrySetResult(e.BytesTransferred);
+            _tcs.SetResult(e.BytesTransferred);
         }
     }
 
-    public void Dispose()
-    {
-        _args.Completed -= OnReceiveCompleted;
-        _args.Dispose();
-    }
+    int IValueTaskSource<int>.GetResult(short token) => _tcs.GetResult(token);
+
+    ValueTaskSourceStatus IValueTaskSource<int>.GetStatus(short token) => _tcs.GetStatus(token);
+
+    void IValueTaskSource<int>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
+        => _tcs.OnCompleted(continuation, state, token, flags);
 }
