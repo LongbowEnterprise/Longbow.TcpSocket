@@ -30,7 +30,7 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
     private void SendCoreAsync()
     {
         int bytesToSend = Math.Min(_length - _totalSent, 1460);
-        SetBuffer(_buffer[_totalSent..bytesToSend]);
+        SetBuffer(_buffer.Slice(_totalSent, bytesToSend));
 
         if (!socket.SendAsync(this))
         {
