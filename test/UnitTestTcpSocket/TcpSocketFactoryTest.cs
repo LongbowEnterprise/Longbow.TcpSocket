@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks.Sources;
 
 namespace UnitTestTcpSocket;
 
@@ -47,6 +48,44 @@ public class TcpSocketFactoryTest
 
         await client5.DisposeAsync();
         await factory.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task OnCompleted_Ok()
+    {
+        var port = 8882;
+        var server = StartTcpServer(port, MockSplitPackageAsync);
+
+        var client = CreateClient();
+        await client.ConnectAsync("localhost", port);
+
+        // 获得 client 内部 Socket 对象
+        var clientField = client.GetType().GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(clientField);
+
+        var tcpClient = clientField.GetValue(client) as TcpClient;
+        Assert.NotNull(tcpClient);
+
+        var senderType = Type.GetType("Longbow.TcpSocket.Sender, Longbow.TcpSocket");
+        Assert.NotNull(senderType);
+
+        var sender = Activator.CreateInstance(senderType, tcpClient.Client);
+
+        // 反射获得 OnCompleted 方法
+        var method = senderType.GetMethod("OnCompleted", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        // 反射获得 SendAsync 方法
+        var sendAsyncMethod = senderType.GetMethod("SendAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(sendAsyncMethod);
+
+        // 调用 SendAsync 方法
+        ReadOnlyMemory<byte> buffer = new byte[2048];
+        sendAsyncMethod.Invoke(sender, [buffer]);
+
+        // 测试未连接时发送异常逻辑
+        tcpClient.Client.Shutdown(SocketShutdown.Both);
+        sendAsyncMethod.Invoke(sender, [buffer]);
     }
 
     [Fact]

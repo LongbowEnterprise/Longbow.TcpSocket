@@ -63,6 +63,7 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
 
     ValueTaskSourceStatus IValueTaskSource<bool>.GetStatus(short token) => _tcs.GetStatus(token);
 
+    [ExcludeFromCodeCoverage]
     void IValueTaskSource<bool>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
         => _tcs.OnCompleted(continuation, state, token, flags);
 }
