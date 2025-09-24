@@ -62,7 +62,10 @@ public static class ITcpSocketClientExtensions
         {
             var len = await client.ReceiveAsync(buffer, token);
             var payload = new byte[len];
-            Buffer.BlockCopy(buffer, 0, payload, 0, len);
+            if (len > 0)
+            {
+                Buffer.BlockCopy(buffer, 0, payload, 0, len);
+            }
             return payload;
         }
         finally

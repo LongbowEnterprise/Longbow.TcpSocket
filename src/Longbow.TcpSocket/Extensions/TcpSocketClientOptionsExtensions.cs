@@ -10,9 +10,6 @@ static class TcpSocketClientOptionsExtensions
     {
         ReceiveBufferSize = source.ReceiveBufferSize,
         IsAutoReceive = source.IsAutoReceive,
-        ConnectTimeout = source.ConnectTimeout,
-        SendTimeout = source.SendTimeout,
-        ReceiveTimeout = source.ReceiveTimeout,
         LocalEndPoint = source.LocalEndPoint,
         IsAutoReconnect = source.IsAutoReconnect,
         ReconnectInterval = source.ReconnectInterval,

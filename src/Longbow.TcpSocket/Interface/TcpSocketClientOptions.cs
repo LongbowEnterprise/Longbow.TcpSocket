@@ -25,26 +25,6 @@ public class TcpSocketClientOptions
     public bool IsAutoReceive { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the timeout duration, in milliseconds, for establishing a connection.
-    /// </summary>
-    public int ConnectTimeout { get; set; }
-
-    /// <summary>
-    /// Gets or sets the duration, in milliseconds, to wait for a send operation to complete before timing out.
-    /// </summary>
-    /// <remarks>If the send operation does not complete within the specified timeout period, an exception may
-    /// be thrown.</remarks>
-    public int SendTimeout { get; set; }
-
-    /// <summary>
-    /// Gets or sets the amount of time, in milliseconds, that the receiver will wait for a response before timing out.
-    /// </summary>
-    /// <remarks>Use this property to configure the maximum wait time for receiving a response. Setting an
-    /// appropriate timeout can help prevent indefinite blocking in scenarios where responses may be delayed or
-    /// unavailable.</remarks>
-    public int ReceiveTimeout { get; set; }
-
-    /// <summary>
     /// Gets or sets the local endpoint for the socket client. Default value is <see cref="IPAddress.Any"/>
     /// </summary>
     /// <remarks>This property specifies the local network endpoint that the socket client will bind to when establishing a connection.</remarks>
