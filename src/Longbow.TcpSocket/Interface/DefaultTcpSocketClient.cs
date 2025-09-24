@@ -90,7 +90,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
 
             if (Options.IsAutoReceive)
             {
-                await Task.Run(AutoReceiveAsync, CancellationToken.None);
+                _ = Task.Run(AutoReceiveAsync, CancellationToken.None);
             }
         }
         finally
