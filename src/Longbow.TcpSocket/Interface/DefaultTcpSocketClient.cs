@@ -65,18 +65,9 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         var ret = false;
         try
         {
-            await CloseAsync();
+            await _semaphoreSlimForConnect.WaitAsync(token).ConfigureAwait(false);
 
-            // 并发控制
-            var connectToken = token;
-            if (Options.ConnectTimeout > 0)
-            {
-                // 设置连接超时时间
-                using var connectTokenSource = new CancellationTokenSource(Options.ConnectTimeout);
-                using var link = CancellationTokenSource.CreateLinkedTokenSource(connectToken, connectTokenSource.Token);
-                connectToken = link.Token;
-            }
-            await _semaphoreSlimForConnect.WaitAsync(connectToken).ConfigureAwait(false);
+            await CloseAsync();
 
             if (OnConnecting != null)
             {
@@ -99,7 +90,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
 
             if (Options.IsAutoReceive)
             {
-                _ = Task.Run(AutoReceiveAsync, CancellationToken.None).ConfigureAwait(false);
+                await Task.Run(AutoReceiveAsync, CancellationToken.None);
             }
         }
         finally
@@ -114,8 +105,9 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
 
     private async ValueTask AutoReceiveAsync()
     {
-        // 自动接收方法
-        _autoReceiveTokenSource ??= new();
+        ResetAutoReceiveTokenSource();
+
+        _autoReceiveTokenSource = new();
 
         while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
@@ -176,12 +168,17 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default) => ReceiveCoreAsync(buffer);
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
+    {
+        if (Options.IsAutoReceive)
+        {
+            throw new InvalidOperationException("Cannot call ReceiveAsync when IsAutoReceive is enabled. Please set IsAutoReceive to false");
+        }
 
-    /// <summary>
-    /// <inheritdoc/>
-    /// </summary>
-    public ValueTask CloseAsync()
+        return ReceiveCoreAsync(buffer);
+    }
+
+    private void ResetAutoReceiveTokenSource()
     {
         if (_autoReceiveTokenSource != null)
         {
@@ -189,6 +186,14 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
             _autoReceiveTokenSource.Dispose();
             _autoReceiveTokenSource = null;
         }
+    }
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
+    public ValueTask CloseAsync()
+    {
+        ResetAutoReceiveTokenSource();
 
         _sender?.Dispose();
         _sender = null;
