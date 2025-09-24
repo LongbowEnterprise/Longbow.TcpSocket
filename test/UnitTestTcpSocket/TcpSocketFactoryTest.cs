@@ -3,6 +3,7 @@
 // Website: https://github.com/LongbowExtensions/
 
 using Microsoft.Extensions.DependencyInjection;
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -18,7 +19,7 @@ public class TcpSocketFactoryTest
         var sc = new ServiceCollection();
         sc.AddTcpSocketFactory(op =>
         {
-            op.ConnectTimeout = 1000;
+            op.LocalEndPoint = TcpSocketUtility.ConvertToIpEndPoint("localhost", 0);
         });
         var provider = sc.BuildServiceProvider();
         var factory = provider.GetRequiredService<ITcpSocketFactory>();
@@ -93,7 +94,6 @@ public class TcpSocketFactoryTest
         Assert.False(client.IsConnected);
 
         // 连接 TCP Server
-        client.Options.ConnectTimeout = 1000;
         await client.ConnectAsync("localhost", port);
         Assert.True(client.IsConnected);
         Assert.NotEqual(client.Options.LocalEndPoint, client.LocalEndPoint);
@@ -111,7 +111,6 @@ public class TcpSocketFactoryTest
         // 测试正常电文
         cst.Dispose();
         cst = new();
-        client.Options.SendTimeout = 1000;
         var result = await client.SendAsync("test", Encoding.UTF8, cst.Token);
         Assert.True(result);
 
@@ -120,20 +119,57 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task ReceiveAsync_Timeout()
+    public async Task ReceiveAsync_Ok()
     {
-        var port = 8888;
+        var onConnecting = false;
+        var onConnected = false;
+        var port = 8891;
         var server = StartTcpServer(port, MockSplitPackageAsync);
 
-        await using var client = CreateClient(configureOptions: op => op.ReceiveTimeout = 100);
+        var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
 
-        await client.ConnectAsync("localhost", port);
+        // 未连接时调用 ReceiveAsync 方法会返回 0 字节
+        var payload = await client.ReceiveAsync();
+        Assert.Equal(0, payload.Length);
 
+        client.OnConnecting = () =>
+        {
+            onConnecting = true;
+            return Task.CompletedTask;
+        };
+        client.OnConnected = () =>
+        {
+            onConnected = true;
+            return Task.CompletedTask;
+        };
+
+        // 连接 TCP Server
+        var connected = await client.ConnectAsync("localhost", port);
+        Assert.True(connected);
+        Assert.True(onConnecting);
+        Assert.True(onConnected);
+
+        // 发送数据
         var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-        await client.SendAsync(data);
+        var send = await client.SendAsync(data);
+        Assert.True(send);
 
-        // 等待接收超时
-        await Task.Delay(120);
+        // 未设置数据处理器未开启自动接收时，调用 ReceiveAsync 方法获取数据
+        // 需要自己处理粘包分包和业务问题
+        var buffer = new byte[1024];
+        var len = await client.ReceiveAsync(buffer);
+        Assert.Equal([1, 2, 3, 4, 5], buffer[0..len]);
+
+        // 由于服务器端模拟了拆包发送第二段数据，所以这里可以再次调用 ReceiveAsync 方法获取第二段数据
+        // 调用扩展方法直接获得到接收数据
+        payload = await client.ReceiveAsync();
+        Assert.Equal([3, 4], payload.ToArray());
+
+        // 设置 IsAutoReceive = true 后，调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
+        client.Options.IsAutoReceive = true;
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(async () => await client.ReceiveAsync(buffer));
+
+        // 关闭后停止自动接收
         await client.CloseAsync();
     }
 
@@ -149,63 +185,6 @@ public class TcpSocketFactoryTest
 
         await Assert.ThrowsAnyAsync<Exception>(async () => await client.ReceiveAsync());
         server.Stop();
-    }
-
-    [Fact]
-    public async Task ReceiveAsync_NotConnected()
-    {
-        // 未连接时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var client = CreateClient(configureOptions: op => op.IsAutoReceive = true);
-        // 内部未连接 返回 0 字节
-        var len = await client.ReceiveAsync(new byte[1024]);
-        Assert.Equal(0, len);
-
-        // 已连接但是启用了自动接收功能时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var port = 8893;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
-
-        var connected = await client.ConnectAsync("localhost", port);
-        Assert.True(connected);
-    }
-
-    [Fact]
-    public async Task ReceiveAsync_Ok()
-    {
-        var onConnecting = false;
-        var onConnected = false;
-        var port = 8891;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
-
-        var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
-        client.OnConnecting = () =>
-        {
-            onConnecting = true;
-            return Task.CompletedTask;
-        };
-        client.OnConnected = () =>
-        {
-            onConnected = true;
-            return Task.CompletedTask;
-        };
-        var connected = await client.ConnectAsync("localhost", port);
-        Assert.True(connected);
-        Assert.True(onConnecting);
-        Assert.True(onConnected);
-
-        var data = new ReadOnlyMemory<byte>([1, 2, 3, 4, 5]);
-        var send = await client.SendAsync(data);
-        Assert.True(send);
-
-        // 未设置数据处理器未开启自动接收时，调用 ReceiveAsync 方法获取数据
-        // 需要自己处理粘包分包和业务问题
-        var buffer = new byte[1024];
-        var len = await client.ReceiveAsync(buffer);
-        Assert.Equal([1, 2, 3, 4, 5], buffer[0..len]);
-
-        // 由于服务器端模拟了拆包发送第二段数据，所以这里可以再次调用 ReceiveAsync 方法获取第二段数据
-        // 调用扩展方法直接获得到接收数据
-        var payload = await client.ReceiveAsync();
-        Assert.Equal([3, 4], payload.ToArray());
     }
 
     [Fact]
