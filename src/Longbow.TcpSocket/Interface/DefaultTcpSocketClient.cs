@@ -117,41 +117,30 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         // 自动接收方法
         _autoReceiveTokenSource ??= new();
 
-        using var block = MemoryPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
-        var buffer = block.Memory;
         while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
-            await ReceiveCoreAsync(block.Memory, _autoReceiveTokenSource.Token);
+            var buffer = ArrayPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
+            try
+            {
+                await ReceiveCoreAsync(buffer);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
     }
 
-    private async ValueTask<int> ReceiveCoreAsync(Memory<byte> buffer, CancellationToken token)
+    private async ValueTask<int> ReceiveCoreAsync(Memory<byte> buffer)
     {
         var len = 0;
         try
         {
             if (_client is { Connected: true })
             {
-                var receiveToken = token;
-                if (Options.ReceiveTimeout > 0)
-                {
-                    // 设置接收超时时间
-                    using var receiveTokenSource = new CancellationTokenSource(Options.ReceiveTimeout);
-                    using var link = CancellationTokenSource.CreateLinkedTokenSource(receiveToken, receiveTokenSource.Token);
-                    receiveToken = link.Token;
-                }
-
                 _receiver ??= new Receiver(_client.Client);
-                len = await _receiver.ReceiveAsync(buffer, receiveToken);
+                len = await _receiver.ReceiveAsync(buffer);
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // canceled
-        }
-        catch (Exception)
-        {
-
         }
         finally
         {
@@ -178,14 +167,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         var ret = false;
         if (_sender != null)
         {
-            var sendToken = token;
-            if (Options.SendTimeout > 0)
-            {
-                using var sendTokenSource = new CancellationTokenSource(Options.SendTimeout);
-                using var link = CancellationTokenSource.CreateLinkedTokenSource(token, sendTokenSource.Token);
-                sendToken = link.Token;
-            }
-            ret = await _sender.SendAsync(data, sendToken);
+            ret = await _sender.SendAsync(data);
         }
 
         return ret;
@@ -194,7 +176,7 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
-    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default) => ReceiveCoreAsync(buffer, token);
+    public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default) => ReceiveCoreAsync(buffer);
 
     /// <summary>
     /// <inheritdoc/>

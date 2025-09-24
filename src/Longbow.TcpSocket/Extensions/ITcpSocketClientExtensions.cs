@@ -56,14 +56,19 @@ public static class ITcpSocketClientExtensions
     /// <returns></returns>
     public static async ValueTask<ReadOnlyMemory<byte>> ReceiveAsync(this ITcpSocketClient client, CancellationToken token = default)
     {
-        using var memory = MemoryPool<byte>.Shared.Rent(client.Options.ReceiveBufferSize);
-        var len = await client.ReceiveAsync(memory.Memory, token);
-        if (len == 0)
-        {
-            return ReadOnlyMemory<byte>.Empty;
-        }
+        var buffer = ArrayPool<byte>.Shared.Rent(client.Options.ReceiveBufferSize);
 
-        return memory.Memory[0..len].ToArray();
+        try
+        {
+            var len = await client.ReceiveAsync(buffer, token);
+            var payload = new byte[len];
+            Buffer.BlockCopy(buffer, 0, payload, 0, len);
+            return payload;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     private static readonly ConcurrentDictionary<Func<ReadOnlyMemory<byte>, ValueTask>, Dictionary<IDataPackageAdapter, List<Func<ReadOnlyMemory<byte>, ValueTask>>>> DataPackageAdapterCache = [];

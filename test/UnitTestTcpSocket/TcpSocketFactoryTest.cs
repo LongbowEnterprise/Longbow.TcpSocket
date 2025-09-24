@@ -50,6 +50,40 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
+    public async Task OnCompleted_Ok()
+    {
+        var port = 8882;
+        var server = StartTcpServer(port, MockSplitPackageAsync);
+
+        var client = CreateClient();
+        await client.ConnectAsync("localhost", port);
+
+        // 获得 client 内部 Socket 对象
+        var clientField = client.GetType().GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(clientField);
+
+        var tcpClient = clientField.GetValue(client) as TcpClient;
+        Assert.NotNull(tcpClient);
+
+        var senderType = Type.GetType("Longbow.TcpSocket.Sender, Longbow.TcpSocket");
+        Assert.NotNull(senderType);
+
+        var sender = Activator.CreateInstance(senderType, tcpClient.Client);
+
+        // 反射获得 OnCompleted 方法
+        var method = senderType.GetMethod("OnCompleted", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        // 反射获得 SendAsync 方法
+        var sendAsyncMethod = senderType.GetMethod("SendAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(sendAsyncMethod);
+
+        // 调用 SendAsync 方法
+        ReadOnlyMemory<byte> buffer = new byte[2048];
+        sendAsyncMethod.Invoke(sender, [buffer]);
+    }
+
+    [Fact]
     public async Task SendAsync_Ok()
     {
         var port = 8881;
@@ -104,26 +138,6 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task ReceiveAsync_Cancel()
-    {
-        var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
-
-        // 已连接但是启用了自动接收功能时调用 ReceiveAsync 方法会抛出 InvalidOperationException 异常
-        var port = 8892;
-        var server = StartTcpServer(port, MockMutePackageAsync);
-        await client.ConnectAsync("localhost", port);
-
-        var result = await client.SendAsync(new byte[] { 0x01 });
-        Assert.True(result);
-
-        var token = new CancellationTokenSource(10);
-        var buffer = new byte[12];
-        var len = await client.ReceiveAsync(buffer, token.Token);
-        Assert.Equal(0, len);
-        server.Stop();
-    }
-
-    [Fact]
     public async Task ReceiveAsync_Zero()
     {
         var client = CreateClient(configureOptions: op => op.IsAutoReceive = false);
@@ -133,8 +147,7 @@ public class TcpSocketFactoryTest
         var server = StartTcpServer(port, MockZeroPackageAsync);
         await client.ConnectAsync("localhost", port);
 
-        var buffer = await client.ReceiveAsync();
-        Assert.Equal(ReadOnlyMemory<byte>.Empty, buffer);
+        await Assert.ThrowsAnyAsync<Exception>(async () => await client.ReceiveAsync());
         server.Stop();
     }
 
@@ -354,7 +367,6 @@ public class TcpSocketFactoryTest
 
     private static Task MockZeroPackageAsync(TcpClient client)
     {
-        // 模拟延时
         client.Close();
         return Task.CompletedTask;
     }
