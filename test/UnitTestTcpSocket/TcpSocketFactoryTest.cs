@@ -3,7 +3,6 @@
 // Website: https://github.com/LongbowExtensions/
 
 using Microsoft.Extensions.DependencyInjection;
-using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
