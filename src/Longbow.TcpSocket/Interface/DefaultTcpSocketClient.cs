@@ -117,11 +117,17 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
         // 自动接收方法
         _autoReceiveTokenSource ??= new();
 
-        using var block = MemoryPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
-        var buffer = block.Memory;
         while (_autoReceiveTokenSource is { IsCancellationRequested: false })
         {
-            await ReceiveCoreAsync(block.Memory);
+            var buffer = ArrayPool<byte>.Shared.Rent(Options.ReceiveBufferSize);
+            try
+            {
+                await ReceiveCoreAsync(buffer);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
     }
 
