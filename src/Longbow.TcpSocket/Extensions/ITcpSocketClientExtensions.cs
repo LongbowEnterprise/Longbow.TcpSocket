@@ -61,7 +61,9 @@ public static class ITcpSocketClientExtensions
         try
         {
             var len = await client.ReceiveAsync(buffer, token);
-            return new ReadOnlyMemory<byte>(buffer, 0, len);
+            var payload = new byte[len];
+            Buffer.BlockCopy(buffer, 0, payload, 0, len);
+            return payload;
         }
         finally
         {
