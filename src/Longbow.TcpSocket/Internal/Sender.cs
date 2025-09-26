@@ -22,6 +22,25 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
         _length = data.Length;
         _totalSent = 0;
         _buffer = MemoryMarshal.AsMemory(data);
+        SetBuffer(_buffer);
+
+        // 发送数据
+        SendCoreAsync();
+
+        return new ValueTask<bool>(this, _tcs.Version);
+    }
+
+    public ValueTask<bool> SendAsync(IList<ArraySegment<byte>> data)
+    {
+        _tcs.Reset();
+
+        _length = data.Sum(i => i.Count);
+        _totalSent = 0;
+
+        SetBuffer(null, 0, 0);
+        BufferList = data;
+
+        // 发送数据
         SendCoreAsync();
 
         return new ValueTask<bool>(this, _tcs.Version);
@@ -29,8 +48,11 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
 
     private void SendCoreAsync()
     {
-        int bytesToSend = Math.Min(_length - _totalSent, 1460);
-        SetBuffer(_buffer.Slice(_totalSent, bytesToSend));
+        if (BufferList == null)
+        {
+            int bytesToSend = Math.Min(_length - _totalSent, 1460);
+            SetBuffer(_totalSent, bytesToSend);
+        }
 
         if (!socket.SendAsync(this))
         {
