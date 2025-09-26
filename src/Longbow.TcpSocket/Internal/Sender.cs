@@ -48,12 +48,6 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
 
     private void SendCoreAsync()
     {
-        if (BufferList == null)
-        {
-            int bytesToSend = Math.Min(_length - _totalSent, 1460);
-            SetBuffer(_totalSent, bytesToSend);
-        }
-
         if (!socket.SendAsync(this))
         {
             OnCompleted(this);
@@ -71,6 +65,9 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
             }
             else
             {
+                int bytesToSend = Math.Min(_length - _totalSent, 1460);
+
+                SetBuffer(_totalSent, bytesToSend);
                 SendCoreAsync();
             }
         }
