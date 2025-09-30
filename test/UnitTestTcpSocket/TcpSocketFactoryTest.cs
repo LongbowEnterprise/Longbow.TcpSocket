@@ -118,6 +118,29 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
+    public async Task SendAsync_BufferList_Ok()
+    {
+        var port = 8883;
+        var server = StartTcpServer(port, MockSplitPackageAsync);
+
+        var client = CreateClient();
+
+        // 连接 TCP Server
+        await client.ConnectAsync("localhost", port);
+
+        var buffer = new List<ArraySegment<byte>>
+        {
+            new byte[2],
+            new byte[3]
+        };
+        var result = await client.SendAsync(buffer);
+        Assert.True(result);
+
+        // 关闭连接
+        StopTcpServer(server);
+    }
+
+    [Fact]
     public async Task ReceiveAsync_Ok()
     {
         var onConnecting = false;
