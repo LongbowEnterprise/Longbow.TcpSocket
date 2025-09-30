@@ -11,46 +11,44 @@ namespace Longbow.TcpSocket;
 sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool>
 {
     private ManualResetValueTaskSourceCore<bool> _tcs;
-    private int _length;
-    private int _totalSent;
-    private Memory<byte> _buffer;
 
     public ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data)
     {
         _tcs.Reset();
 
-        _length = data.Length;
-        _totalSent = 0;
-        _buffer = MemoryMarshal.AsMemory(data);
-        SendCoreAsync();
+        var _buffer = MemoryMarshal.AsMemory(data);
+        SetBuffer(_buffer);
 
-        return new ValueTask<bool>(this, _tcs.Version);
-    }
-
-    private void SendCoreAsync()
-    {
-        int bytesToSend = Math.Min(_length - _totalSent, 1460);
-        SetBuffer(_buffer.Slice(_totalSent, bytesToSend));
-
+        // 发送数据
         if (!socket.SendAsync(this))
         {
             OnCompleted(this);
         }
+
+        return new ValueTask<bool>(this, _tcs.Version);
+    }
+
+    public ValueTask<bool> SendAsync(IList<ArraySegment<byte>> data)
+    {
+        _tcs.Reset();
+
+        SetBuffer(null, 0, 0);
+        BufferList = data;
+
+        // 发送数据
+        if (!socket.SendAsync(this))
+        {
+            OnCompleted(this);
+        }
+
+        return new ValueTask<bool>(this, _tcs.Version);
     }
 
     protected override void OnCompleted(SocketAsyncEventArgs e)
     {
         if (e.SocketError == SocketError.Success)
         {
-            _totalSent += e.BytesTransferred;
-            if (_totalSent >= _length)
-            {
-                _tcs.SetResult(true);
-            }
-            else
-            {
-                SendCoreAsync();
-            }
+            _tcs.SetResult(true);
         }
         else
         {
@@ -59,6 +57,7 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
         }
     }
 
+    #region IValueTaskSource Implementation
     bool IValueTaskSource<bool>.GetResult(short token) => _tcs.GetResult(token);
 
     ValueTaskSourceStatus IValueTaskSource<bool>.GetStatus(short token) => _tcs.GetStatus(token);
@@ -66,4 +65,5 @@ sealed class Sender(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<bool
     [ExcludeFromCodeCoverage]
     void IValueTaskSource<bool>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
         => _tcs.OnCompleted(continuation, state, token, flags);
+    #endregion
 }

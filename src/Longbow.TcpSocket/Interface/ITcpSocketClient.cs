@@ -72,6 +72,14 @@ public interface ITcpSocketClient : IAsyncDisposable
     ValueTask<bool> SendAsync(ReadOnlyMemory<byte> data, CancellationToken token = default);
 
     /// <summary>
+    /// 批量发送数据方法
+    /// </summary>
+    /// <param name="data"></param>
+    /// <param name="token"></param>
+    /// <returns></returns>
+    ValueTask<bool> SendAsync(IList<ArraySegment<byte>> data, CancellationToken token = default);
+
+    /// <summary>
     /// 异步接收方法
     /// </summary>
     /// <param name="buffer"></param>

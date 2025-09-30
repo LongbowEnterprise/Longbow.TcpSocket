@@ -41,10 +41,12 @@ sealed class Receiver(Socket socket) : SocketAsyncEventArgs, IValueTaskSource<in
         }
     }
 
+    #region IValueTaskSource Implementation
     int IValueTaskSource<int>.GetResult(short token) => _tcs.GetResult(token);
 
     ValueTaskSourceStatus IValueTaskSource<int>.GetStatus(short token) => _tcs.GetStatus(token);
 
     void IValueTaskSource<int>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags)
         => _tcs.OnCompleted(continuation, state, token, flags);
+    #endregion
 }

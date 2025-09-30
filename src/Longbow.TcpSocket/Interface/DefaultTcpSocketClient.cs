@@ -168,6 +168,25 @@ sealed class DefaultTcpSocketClient(IOptions<TcpSocketClientOptions> options) : 
     /// <summary>
     /// <inheritdoc/>
     /// </summary>
+    public async ValueTask<bool> SendAsync(IList<ArraySegment<byte>> data, CancellationToken token = default)
+    {
+        if (_client != null)
+        {
+            _sender ??= new Sender(_client.Client);
+        }
+
+        var ret = false;
+        if (_sender != null)
+        {
+            ret = await _sender.SendAsync(data);
+        }
+
+        return ret;
+    }
+
+    /// <summary>
+    /// <inheritdoc/>
+    /// </summary>
     public ValueTask<int> ReceiveAsync(Memory<byte> buffer, CancellationToken token = default)
     {
         if (Options.IsAutoReceive)
