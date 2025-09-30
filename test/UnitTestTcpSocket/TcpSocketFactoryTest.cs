@@ -50,40 +50,6 @@ public class TcpSocketFactoryTest
     }
 
     [Fact]
-    public async Task OnCompleted_Ok()
-    {
-        var port = 8882;
-        var server = StartTcpServer(port, MockSplitPackageAsync);
-
-        var client = CreateClient();
-        await client.ConnectAsync("localhost", port);
-
-        // 获得 client 内部 Socket 对象
-        var clientField = client.GetType().GetField("_client", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        Assert.NotNull(clientField);
-
-        var tcpClient = clientField.GetValue(client) as TcpClient;
-        Assert.NotNull(tcpClient);
-
-        var senderType = Type.GetType("Longbow.TcpSocket.Sender, Longbow.TcpSocket");
-        Assert.NotNull(senderType);
-
-        var sender = Activator.CreateInstance(senderType, tcpClient.Client);
-
-        // 反射获得 OnCompleted 方法
-        var method = senderType.GetMethod("OnCompleted", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        Assert.NotNull(method);
-
-        // 反射获得 SendAsync 方法
-        var sendAsyncMethod = senderType.GetMethod("SendAsync", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-        Assert.NotNull(sendAsyncMethod);
-
-        // 调用 SendAsync 方法
-        ReadOnlyMemory<byte> buffer = new byte[2048];
-        sendAsyncMethod.Invoke(sender, [buffer]);
-    }
-
-    [Fact]
     public async Task SendAsync_Ok()
     {
         var port = 8881;
@@ -138,6 +104,30 @@ public class TcpSocketFactoryTest
 
         // 关闭连接
         StopTcpServer(server);
+    }
+
+    [Fact]
+    public void Sender_Coverage_Ok()
+    {
+        // 利用反射测试 Sender OnCompleted 方法覆盖率
+        var type = Type.GetType("Longbow.TcpSocket.Sender, Longbow.TcpSocket");
+        Assert.NotNull(type);
+
+        var instance = Activator.CreateInstance(type, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+        Assert.NotNull(instance);
+
+        var method = type.GetMethod("OnCompleted", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        method.Invoke(instance, [new MockSocketAsyncEventArgs()]);
+    }
+
+    class MockSocketAsyncEventArgs : SocketAsyncEventArgs
+    {
+        public MockSocketAsyncEventArgs()
+        {
+            SocketError = SocketError.SocketError;
+        }
     }
 
     [Fact]
@@ -207,6 +197,22 @@ public class TcpSocketFactoryTest
 
         await Assert.ThrowsAnyAsync<Exception>(async () => await client.ReceiveAsync());
         server.Stop();
+    }
+
+    [Fact]
+    public void Receiver_Coverage_Ok()
+    {
+        // 利用反射测试 Receiver OnCompleted 方法覆盖率
+        var type = Type.GetType("Longbow.TcpSocket.Receiver, Longbow.TcpSocket");
+        Assert.NotNull(type);
+
+        var instance = Activator.CreateInstance(type, new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp));
+        Assert.NotNull(instance);
+
+        var method = type.GetMethod("OnCompleted", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        Assert.NotNull(method);
+
+        method.Invoke(instance, [new MockSocketAsyncEventArgs()]);
     }
 
     [Fact]
